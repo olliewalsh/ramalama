@@ -271,18 +271,19 @@ class ModelScope(Model):
             ms_repo = ModelScopeRepository(name, organization)
             snapshot_hash = ms_repo.model_hash
             files = ms_repo.get_file_list(cached_files)
-            self.store.new_snapshot(tag, snapshot_hash, files)
+            try:
+                self.store.new_snapshot(tag, snapshot_hash, files)
+            except Exception as e:
+                # Cleanup failed snapshot
+                try:
+                    self.store.remove_snapshot(tag)
+                except Exception:
+                    # ignore any error when removing snapshot
+                    pass
         except Exception as e:
             if not self.ms_available:
                 perror("URL pull failed and modelscope not available")
                 raise KeyError(f"Failed to pull model: {str(e)}")
-
-            # Cleanup previously created snapshot
-            try:
-                self.store.remove_snapshot(tag)
-            except Exception:
-                # ignore any error when removing snapshot
-                pass
 
             # Create temporary directory for downloading via modelscope
             with tempfile.TemporaryDirectory() as tempdir:
