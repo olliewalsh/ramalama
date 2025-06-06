@@ -150,14 +150,13 @@ def exec_cmd(args, stdout2null=False, stderr2null=False):
         raise
 
 
-def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_all=False):
+def run_cmd(args, cwd=None, ignore_stderr=False, ignore_all=False):
     """
     Run the given command arguments.
 
     Args:
     args: command line arguments to execute in a subprocess
     cwd: optional working directory to run the command from
-    stdout: standard output configuration
     ignore_stderr: if True, ignore standard error
     ignore_all: if True, ignore both standard output and standard error
     """
