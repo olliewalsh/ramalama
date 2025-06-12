@@ -336,6 +336,7 @@ class HFStyleRepoModel(Model, ABC):
             self.store.new_snapshot(tag, snapshot_hash, files)
 
         except Exception as e:
+            raise
             if not available(self.get_cli_command()):
                 perror(f"URL pull failed and {self.get_cli_command()} not available")
                 raise KeyError(f"Failed to pull model: {str(e)}")
