@@ -29,21 +29,24 @@ Modify individual model transports by specifying the `huggingface://`, `oci://`,
 URL support means if a model is on a web site or even on your local system, you can run it directly.
 
 ## REST API ENDPOINTS
-Under the hood, `ramalama-serve` uses the `LLaMA.cpp` HTTP server by default.
+Under the hood, `ramalama-serve` uses the `llama.cpp` HTTP server by default. When using `--runtime=vllm`, it uses the vLLM server. When using `--runtime=mlx`, it uses the MLX LM server.
 
-For REST API endpoint documentation, see: [https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#api-endpoints](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#api-endpoints)
+For REST API endpoint documentation, see:
+- llama.cpp: [https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#api-endpoints](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#api-endpoints)
+- vLLM: [https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html)
+- MLX LM: [https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md)
 
 ## OPTIONS
 
 #### **--api**=**llama-stack** | none**
-unified API layer for Inference, RAG, Agents, Tools, Safety, Evals, and Telemetry.(default: none)
+Unified API layer for Inference, RAG, Agents, Tools, Safety, Evals, and Telemetry.(default: none)
 The default can be overridden in the ramalama.conf file.
 
 #### **--authfile**=*password*
-path of the authentication file for OCI registries
+Path of the authentication file for OCI registries
 
 #### **--ctx-size**, **-c**
-size of the prompt context (default: 2048, 0 = loaded from model)
+size of the prompt context. This option is also available as **--max-model-len**. Applies to llama.cpp and vllm regardless of alias (default: 2048, 0 = loaded from model)
 
 #### **--detach**, **-d**
 Run the container in the background and print the new container ID.
@@ -59,6 +62,9 @@ write, and m for mknod(2).
 Example: --device=/dev/dri/renderD128:/dev/xvdc:rwm
 
 The device specification is passed directly to the underlying container engine. See documentation of the supported container engine for more information.
+
+#### **--dri**=*on* | *off*
+Enable or disable mounting `/dev/dri` into the container when running with `--api=llama-stack` (enabled by default). Use to prevent access to the host device when not required, or avoid errors in environments where `/dev/dri` is not available.
 
 #### **--env**=
 
@@ -87,8 +93,34 @@ show this help message and exit
 #### **--host**="0.0.0.0"
 IP address for llama.cpp to listen on.
 
-#### **--model-draft**
+#### **--image**=IMAGE
+OCI container image to run with specified AI model. RamaLama defaults to using
+images based on the accelerator it discovers. For example:
+`quay.io/ramalama/ramalama`. See the table above for all default images.
+The default image tag is based on the minor version of the RamaLama package.
+Version 0.11.0 of RamaLama pulls an image with a `:0.11` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
 
+The default can be overridden in the ramalama.conf file or via the
+RAMALAMA_IMAGE environment variable. `export RAMALAMA_IMAGE=quay.io/ramalama/aiimage:1.2` tells
+RamaLama to use the `quay.io/ramalama/aiimage:1.2` image.
+
+Accelerated images:
+
+| Accelerator             | Image                      |
+| ------------------------| -------------------------- |
+|  CPU, Apple             | quay.io/ramalama/ramalama  |
+|  HIP_VISIBLE_DEVICES    | quay.io/ramalama/rocm      |
+|  CUDA_VISIBLE_DEVICES   | quay.io/ramalama/cuda      |
+|  ASAHI_VISIBLE_DEVICES  | quay.io/ramalama/asahi     |
+|  INTEL_VISIBLE_DEVICES  | quay.io/ramalama/intel-gpu |
+|  ASCEND_VISIBLE_DEVICES | quay.io/ramalama/cann      |
+|  MUSA_VISIBLE_DEVICES   | quay.io/ramalama/musa      |
+
+#### **--keep-groups**
+pass --group-add keep-groups to podman (default: False)
+If GPU device on host system is accessible to user via group access, this option leaks the groups into the container.
+
+#### **--model-draft**
 
 A draft model is a smaller, faster model that helps accelerate the decoding
 process of larger, more complex models, like Large Language Models (LLMs). It
@@ -158,6 +190,9 @@ Add *args* to the runtime (llama.cpp or vllm) invocation.
 
 #### **--seed**=
 Specify seed rather than using random seed model interaction
+
+#### **--selinux**=*true*
+Enable SELinux container separation
 
 #### **--temp**="0.8"
 Temperature of the response from the AI Model.
@@ -370,8 +405,8 @@ spec:
       containers:
       - name: model-server
 	image: quay.io/ramalama/ramalama:0.8
-	command: ["/usr/libexec/ramalama/ramalama-serve-core"]
-	args: ['llama-server', '--port', '8081', '--model', '/mnt/models/model.file', '--alias', 'quay.io/rhatdan/granite:latest', '--ctx-size', 2048, '--temp', '0.8', '--jinja', '--cache-reuse', '256', '-v', '--threads', 16, '--host', '127.0.0.1']
+	command: ["llama-server"]
+	args: ['--port', '8081', '--model', '/mnt/models/model.file', '--alias', 'quay.io/rhatdan/granite:latest', '--ctx-size', 2048, '--temp', '0.8', '--jinja', '--cache-reuse', '256', '-v', '--threads', 16, '--host', '127.0.0.1']
 	securityContext:
 	  allowPrivilegeEscalation: false
 	  capabilities:
@@ -459,6 +494,27 @@ WantedBy=multi-user.target default.target
 ## NVIDIA CUDA Support
 
 See **[ramalama-cuda(7)](ramalama-cuda.7.md)** for setting up the host Linux system for CUDA support.
+
+## MLX Support
+
+The MLX runtime is designed for Apple Silicon Macs and provides optimized performance on these systems. MLX support has the following requirements:
+
+- **Operating System**: macOS only
+- **Hardware**: Apple Silicon (M1, M2, M3, or later)
+- **Container Mode**: MLX requires `--nocontainer` as it cannot run inside containers
+- **Dependencies**: Requires `mlx-lm` package to be installed on the host system
+
+To install MLX dependencies, use either `uv` or `pip`:
+```bash
+uv pip install mlx-lm
+# or pip:
+pip install mlx-lm
+```
+
+Example usage:
+```bash
+ramalama --runtime=mlx serve hf://mlx-community/Unsloth-Phi-4-4bit
+```
 
 ## SEE ALSO
 **[ramalama(1)](ramalama.1.md)**, **[ramalama-stop(1)](ramalama-stop.1.md)**, **quadlet(1)**, **systemctl(1)**, **podman(1)**, **podman-ps(1)**, **[ramalama-cuda(7)](ramalama-cuda.7.md)**

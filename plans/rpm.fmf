@@ -1,0 +1,8 @@
+discover:
+    how: shell
+    tests:
+        - name: /info
+          test: rpm -qi ramalama
+
+execute:
+    how: tmt

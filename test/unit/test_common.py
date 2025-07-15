@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 from sys import platform
 from unittest.mock import patch
@@ -8,8 +9,8 @@ from unittest.mock import patch
 import pytest
 
 from ramalama.cli import configure_subcommands, create_argument_parser
-from ramalama.common import DEFAULT_IMAGE, accel_image, minor_release, rm_until_substring, verify_checksum
-from ramalama.config import load_and_merge_config
+from ramalama.common import accel_image, get_accel, rm_until_substring, verify_checksum
+from ramalama.config import DEFAULT_IMAGE, default_config
 
 
 @pytest.mark.parametrize(
@@ -63,7 +64,9 @@ I have been tampered with
         ("sha256:16cd1aa2bd52b0e87ff143e8a8a7bb6fcb0163c624396ca58e7f75ec99ef081f", tampered_input, None, False),
     ],
 )
-def test_verify_checksum(input_file_name: str, content: str, expected_error: Exception, expected_result: bool):
+def test_verify_checksum(
+    input_file_name: str, content: str, expected_error: type[Exception] | None, expected_result: bool
+):
     # skip this test case on Windows since colon is not a valid file symbol
     if ":" in input_file_name and platform == "win32":
         return
@@ -92,22 +95,22 @@ DEFAULT_IMAGES = {
 
 
 @pytest.mark.parametrize(
-    "accel_env,arg_override,env_override,config_override,expected_result",
+    "accel_env,env_override,config_override,expected_result",
     [
-        (None, f"{DEFAULT_IMAGE}:latest", None, None, f"{DEFAULT_IMAGE}:latest"),
-        (None, None, f"{DEFAULT_IMAGE}:latest", None, f"{DEFAULT_IMAGE}:latest"),
-        (None, None, None, f"{DEFAULT_IMAGE}:latest", f"{DEFAULT_IMAGE}:latest"),
-        ("HIP_VISIBLE_DEVICES", None, None, None, f"quay.io/ramalama/rocm:{minor_release()}"),
-        ("HIP_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest", None, None, f"{DEFAULT_IMAGE}:latest"),
-        ("HIP_VISIBLE_DEVICES", None, f"{DEFAULT_IMAGE}:latest", None, f"{DEFAULT_IMAGE}:latest"),
-        ("HIP_VISIBLE_DEVICES", None, None, f"{DEFAULT_IMAGE}:latest", f"{DEFAULT_IMAGE}:latest"),
+        (None, None, None, f"{DEFAULT_IMAGE}:latest"),
+        (None, f"{DEFAULT_IMAGE}:latest", None, f"{DEFAULT_IMAGE}:latest"),
+        (None, None, f"{DEFAULT_IMAGE}:latest", f"{DEFAULT_IMAGE}:latest"),
+        ("HIP_VISIBLE_DEVICES", None, None, "quay.io/ramalama/rocm:latest"),
+        ("HIP_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest", None, f"{DEFAULT_IMAGE}:latest"),
+        ("HIP_VISIBLE_DEVICES", None, f"{DEFAULT_IMAGE}:latest", f"{DEFAULT_IMAGE}:latest"),
     ],
 )
-def test_accel_image(accel_env: str, arg_override: str, env_override: str, config_override: str, expected_result: str):
+def test_accel_image(accel_env: str, env_override, config_override: str, expected_result: str, monkeypatch):
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+    monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
+
     with tempfile.NamedTemporaryFile('w', delete_on_close=False) as f:
         cmdline = []
-        if arg_override:
-            cmdline.extend(["--image", arg_override])
         cmdline.extend(["run", "granite"])
 
         env = {}
@@ -116,7 +119,7 @@ def test_accel_image(accel_env: str, arg_override: str, env_override: str, confi
                 f"""\
 [ramalama]
 image = "{config_override}"
-            """
+                """
             )
             f.flush()
             env["RAMALAMA_CONFIG"] = f.name
@@ -129,9 +132,54 @@ image = "{config_override}"
             env["RAMALAMA_IMAGE"] = env_override
 
         with patch.dict("os.environ", env, clear=True):
-            config = load_and_merge_config()
+
+            config = default_config()
             with patch("ramalama.cli.CONFIG", config):
                 parser = create_argument_parser("test_accel_image")
                 configure_subcommands(parser)
-                args = parser.parse_args(cmdline)
-                assert accel_image(config, args) == expected_result
+                assert accel_image(config) == expected_result
+
+
+@patch("ramalama.config.CONFIG")
+@patch("ramalama.common.run_cmd")
+@patch("ramalama.common.handle_provider")
+def test_apple_vm_returns_result(mock_handle_provider, mock_run_cmd, mock_config):
+    mock_run_cmd.return_value.stdout = b'[{"Name": "myvm"}]'
+    mock_handle_provider.return_value = True
+    mock_config.user.no_missing_gpu_prompt = True
+    from ramalama.common import apple_vm
+
+    result = apple_vm("podman", mock_config)
+
+    assert result is True
+    mock_run_cmd.assert_called_once_with(
+        ["podman", "machine", "list", "--format", "json", "--all-providers"], ignore_stderr=True
+    )
+    mock_handle_provider.assert_called_once_with({"Name": "myvm"}, mock_config)
+
+
+class TestGetAccel:
+    accels = [
+        ("check_rocm_amd", "hip"),
+        ("check_nvidia", "cuda"),
+        ("check_mthreads", "musa"),
+        ("check_intel", "intel"),
+        ("check_ascend", "cann"),
+        ("check_asahi", "asahi"),
+    ]
+
+    @pytest.mark.parametrize("accel,expected", accels)
+    def test_get_accel(self, accel, expected):  # sourcery skip: no-loop-in-tests
+        with ExitStack() as stack:
+            for other_accel, _ in self.accels:
+                return_value = expected if other_accel == accel else None
+                stack.enter_context(patch(f"ramalama.common.{other_accel}", return_value=return_value))
+            returned_accel = get_accel()
+            assert returned_accel == expected
+
+    def test_default_get_accel(self):  # sourcery skip: no-loop-in-tests
+        with ExitStack() as stack:
+            for other_accel, _ in self.accels:
+                stack.enter_context(patch(f"ramalama.common.{other_accel}", return_value=None))
+            returned_accel = get_accel()
+            assert returned_accel == "none"

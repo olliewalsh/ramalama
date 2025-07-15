@@ -65,7 +65,7 @@ The ramalama table contains settings to configure and manage the OCI runtime.
 Unified API layer for Inference, RAG, Agents, Tools, Safety, Evals, and Telemetry.
 Options: llama-stack, none
 
-**carimage**="registry.access.redhat.com/ubi9-micro:latest"
+**carimage**="registry.access.redhat.com/ubi10-micro:latest"
 
 OCI model car image
 
@@ -130,10 +130,19 @@ Specify default port for services to listen on
 - **never**: Never pull the image but use the one from the local containers storage. Throw an error when no image is found.
 - **newer**: Pull if the image on the registry is newer than the one in the local containers storage. An image is considered to be newer when the digests are different. Comparing the time stamps is prone to errors. Pull errors are suppressed if a local image was found.
 
+**rag_format**="qdrant"
+
+Specify the default output format for output of the `ramalama rag` command
+Options: json, markdown, qdrant
+
 **runtime**="llama.cpp"
 
-Specify the AI runtime to use; valid options are 'llama.cpp' and 'vllm' (default: llama.cpp)
-Options: llama.cpp, vllm
+Specify the AI runtime to use; valid options are 'llama.cpp', 'vllm', and 'mlx' (default: llama.cpp)
+Options: llama.cpp, vllm, mlx
+
+**selinux**=false
+
+SELinux container separation enforcement
 
 **store**="$HOME/.local/share/ramalama"
 

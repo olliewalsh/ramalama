@@ -6,8 +6,13 @@ After=local-fs.target
 AddDevice=-/dev/accel
 AddDevice=-/dev/dri
 AddDevice=-/dev/kfd
-Image=
+Image=testimage
+RunInit=true
+Environment=HOME=/tmp
 Exec=
+SecurityLabelDisable=true
+DropCapability=all
+NoNewPrivileges=true
 Mount=type=image,source=tinyllama,destination=/mnt/models,subpath=/models,readwrite=false
 
 [Install]

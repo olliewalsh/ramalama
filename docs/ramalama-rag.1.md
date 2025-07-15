@@ -19,7 +19,7 @@ positional arguments:
 	    AsciiDoc & Markdown formatted files to be processed.
 	    Can be specified multiple times.
 
-  *IMAGE*   OCI Image name to contain processed rag data
+  *PATH|IMAGE*   Path or OCI Image name to contain processed rag data
 
 ## OPTIONS
 
@@ -32,8 +32,44 @@ process to be launched inside of the container. If an environment variable is
 specified without a value, the container engine checks the host environment
 for a value and set the variable only if it is set on the host.
 
+#### **--format**=*json* |  *markdown* | *qdrant* |
+Convert documents into the following formats
+
+| Type    | Description                                          |
+| ------- | ---------------------------------------------------- |
+| json    | JavaScript Object Notation. lightweight format for exchanging data |
+| markdown| Lightweight markup language using plain text editing |
+| qdrant  | Retrieval-Augmented Generation (RAG) Vector database |
+
 #### **--help**, **-h**
 Print usage message
+
+#### **--image**=IMAGE
+OCI container image to run with specified AI model. RamaLama defaults to using
+images based on the accelerator it discovers. For example:
+`quay.io/ramalama/ramalama-rag`. See the table below for all default images.
+The default image tag is based on the minor version of the RamaLama package.
+Version 0.11.0 of RamaLama pulls an image with a `:0.11` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
+
+The default can be overridden in the ramalama.conf file or via the
+RAMALAMA_IMAGE environment variable. `export RAMALAMA_IMAGE=quay.io/ramalama/aiimage:1.2` tells
+RamaLama to use the `quay.io/ramalama/aiimage:1.2` image.
+
+Accelerated images:
+
+| Accelerator             | Image                          |
+| ------------------------| ------------------------------ |
+|  CPU, Apple             | quay.io/ramalama/ramalama-rag  |
+|  HIP_VISIBLE_DEVICES    | quay.io/ramalama/rocm-rag      |
+|  CUDA_VISIBLE_DEVICES   | quay.io/ramalama/cuda-rag      |
+|  ASAHI_VISIBLE_DEVICES  | quay.io/ramalama/asahi-rag     |
+|  INTEL_VISIBLE_DEVICES  | quay.io/ramalama/intel-gpu-rag |
+|  ASCEND_VISIBLE_DEVICES | quay.io/ramalama/cann-rag      |
+|  MUSA_VISIBLE_DEVICES   | quay.io/ramalama/musa-rag      |
+
+#### **--keep-groups**
+pass --group-add keep-groups to podman (default: False)
+If GPU device on host system is accessible to user via group access, this option leaks the groups into the container.
 
 #### **--network**=*none*
 sets the configuration for network namespaces when handling RUN instructions
@@ -49,10 +85,13 @@ Pull image policy. The default is **missing**.
 - **never**: Never pull the image but use the one from the local containers storage. Throw an error when no image is found.
 - **newer**: Pull if the image on the registry is newer than the one in the local containers storage. An image is considered to be newer when the digests are different. Comparing the time stamps is prone to errors. Pull errors are suppressed if a local image was found.
 
+#### **--selinux**=*true*
+Enable SELinux container separation
+
 ## EXAMPLES
 
 ```
-./bin/ramalama rag ./README.md https://github.com/containers/podman/blob/main/README.md quay.io/rhatdan/myrag
+$ ramalama rag ./README.md https://github.com/containers/podman/blob/main/README.md quay.io/rhatdan/myrag
 100% |███████████████████████████████████████████████████████|  114.00 KB/    0.00 B 922.89 KB/s   59m 59s
 Building quay.io/ramalama/myrag...
 adding vectordb...
@@ -60,7 +99,17 @@ c857ebc65c641084b34e39b740fdb6a2d9d2d97be320e6aa9439ed0ab8780fe0
 ```
 
 ```
-ramalama rag --ocr README.md https://mysight.edu/document quay.io/rhatdan/myrag
+$ ramalama rag --ocr README.md https://mysight.edu/document quay.io/rhatdan/myrag
+```
+
+```
+$ ramalama rag --format markdown /tmp/internet.pdf /tmp/output
+$ ls /tmp/output/docs/tmp/
+/tmp/output/docs/tmp/internet.md
+$ ramalama rag --format json /tmp/internet.pdf /tmp/output
+$ ls /tmp/output/docs/tmp/
+/tmp/output/docs/tmp/internet.md
+/tmp/output/docs/tmp/internet.json
 ```
 
 ## SEE ALSO

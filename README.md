@@ -25,15 +25,15 @@ RamaLama eliminates the need to configure the host system by instead pulling a c
 
 ## Accelerated images
 
-| Accelerator             | Image                      |
-| :-----------------------| :------------------------- |
-|  CPU, Apple             | quay.io/ramalama/ramalama  |
-|  HIP_VISIBLE_DEVICES    | quay.io/ramalama/rocm      |
-|  CUDA_VISIBLE_DEVICES   | quay.io/ramalama/cuda      |
-|  ASAHI_VISIBLE_DEVICES  | quay.io/ramalama/asahi     |
-|  INTEL_VISIBLE_DEVICES  | quay.io/ramalama/intel-gpu |
-|  ASCEND_VISIBLE_DEVICES | quay.io/ramalama/cann      |
-|  MUSA_VISIBLE_DEVICES   | quay.io/ramalama/musa      |
+| Accelerator                       | Image                      |
+| :---------------------------------| :------------------------- |
+|  GGML_VK_VISIBLE_DEVICES (or CPU) | quay.io/ramalama/ramalama  |
+|  HIP_VISIBLE_DEVICES              | quay.io/ramalama/rocm      |
+|  CUDA_VISIBLE_DEVICES             | quay.io/ramalama/cuda      |
+|  ASAHI_VISIBLE_DEVICES            | quay.io/ramalama/asahi     |
+|  INTEL_VISIBLE_DEVICES            | quay.io/ramalama/intel-gpu |
+|  ASCEND_VISIBLE_DEVICES           | quay.io/ramalama/cann      |
+|  MUSA_VISIBLE_DEVICES             | quay.io/ramalama/musa      |
 
 ### GPU support inspection
 On first run, RamaLama inspects your system for GPU support, falling back to CPU if none are present. RamaLama uses container engines like Podman or Docker to pull the appropriate OCI image with all necessary software to run an AI Model for your system setup.
@@ -57,12 +57,13 @@ RamaLama then pulls AI Models from model registries, starting a chatbot or REST 
 | :--------------------------------- | :-------------------------: |
 | CPU                                | &check;                     |
 | Apple Silicon GPU (Linux / Asahi)  | &check;                     |
-| Apple Silicon GPU (macOS)          | &check;                     |
+| Apple Silicon GPU (macOS)          | &check; llama.cpp or MLX    |
 | Apple Silicon GPU (podman-machine) | &check;                     |
 | Nvidia GPU (cuda)                  | &check; See note below      |
-| AMD GPU (rocm)                     | &check;                     |
+| AMD GPU (rocm, vulkan)             | &check;                     |
 | Ascend NPU (Linux)                 | &check;                     |
 | Intel ARC GPUs (Linux)             | &check; See note below      |
+| Intel GPUs (vulkan / Linux)        | &check;                     |
 | Moore Threads GPU (musa / Linux)   | &check; See note below      |
 
 ### Nvidia GPUs
@@ -86,11 +87,27 @@ See the [Intel hardware table](https://dgpu-docs.intel.com/devices/hardware-tabl
 ### Moore Threads GPUs
 On systems with Moore Threads GPUs, see [ramalama-musa](docs/ramalama-musa.7.md) documentation for the correct host system configuration.
 
+### MLX Runtime (macOS only)
+The MLX runtime provides optimized inference for Apple Silicon Macs. MLX requires:
+- macOS operating system
+- Apple Silicon hardware (M1, M2, M3, or later)
+- Usage with `--nocontainer` option (containers are not supported)
+- The `mlx-lm` Python package installed on the host system
+
+To install and run Phi-4 on MLX, use either `uv` or `pip`:
+```bash
+uv pip install mlx-lm
+# or pip:
+pip install mlx-lm
+
+ramalama --runtime=mlx serve hf://mlx-community/Unsloth-Phi-4-4bit
+```
+
 ## Install
 ### Install on Fedora
 RamaLama is available in [Fedora 40](https://fedoraproject.org/) and later. To install it, run:
 ```
-sudo dnf install python3-ramalama
+sudo dnf install ramalama
 ```
 
 ### Install via PyPi
@@ -207,7 +224,7 @@ $ cat /usr/share/ramalama/shortnames.conf
 	<br>
 
 	```
-	$ ramalama bench granite-moe3
+	$ ramalama bench granite3-moe
 	```
 </details>
 
@@ -814,7 +831,7 @@ $ cat /usr/share/ramalama/shortnames.conf
 
 	Perplexity measures how well the model can predict the next token with lower values being better
 	```
-	$ ramalama perplexity granite-moe3
+	$ ramalama perplexity granite3-moe
 	```
 </details>
 
@@ -1041,6 +1058,7 @@ $ cat /usr/share/ramalama/shortnames.conf
 | ------------------------------------------------------ | ---------------------------------------------------------- |
 | [ramalama(1)](https://github.com/containers/ramalama/blob/main/docs/ramalama.1.md)                      | primary RamaLama man page                                  |
 | [ramalama-bench(1)](https://github.com/containers/ramalama/blob/main/docs/ramalama-bench.1.md)| benchmark specified AI Model                                         |
+| [ramalama-chat(1)](https://github.com/containers/ramalama/blob/main/docs/ramalama-chat.1.md)| chat with specified OpenAI REST API                        |
 | [ramalama-containers(1)](https://github.com/containers/ramalama/blob/main/docs/ramalama-containers.1.md)| list all RamaLama containers                               |
 | [ramalama-convert(1)](https://github.com/containers/ramalama/blob/main/docs/ramalama-convert.1.md)      | convert AI Model from local storage to OCI Image           |
 | [ramalama-info(1)](https://github.com/containers/ramalama/blob/main/docs/ramalama-info.1.md)            | display RamaLama configuration information                 |
@@ -1118,6 +1136,7 @@ This project wouldn't be possible without the help of other projects like:
 - [llama.cpp](https://github.com/ggml-org/llama.cpp)
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
 - [vllm](https://github.com/vllm-project/vllm)
+- [mlx-lm](https://github.com/ml-explore/mlx-examples)
 - [podman](https://github.com/containers/podman)
 - [huggingface](https://github.com/huggingface)
 

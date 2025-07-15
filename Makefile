@@ -8,6 +8,10 @@ PYTHON ?= $(shell command -v python3 python|head -n1)
 DESTDIR ?= /
 PATH := $(PATH):$(HOME)/.local/bin
 IMAGE ?= ramalama
+PROJECT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+PYTHON_SCRIPTS := $(shell grep -lEr "^\#\!\s*/usr/bin/(env +)?python(3)?(\s|$$)" --exclude-dir={.venv,venv} $(PROJECT_DIR) || true)
+PYTEST_COMMON_CMD ?= PYTHONPATH=. pytest test/unit/ -vv
+BATS_IMAGE ?= localhost/bats:latest
 
 default: help
 
@@ -39,15 +43,16 @@ help:
 	@echo
 
 install-detailed-cov-requirements:
-	uv pip install ".[cov-detailed]"
+	pip install ".[cov-detailed]"
 
 .PHONY: install-cov-requirements
 install-cov-requirements:
-	uv pip install ".[cov]"
+	pip install ".[cov]"
 
 .PHONY: install-requirements
 install-requirements:
-	uv pip install ".[dev]"
+	./install-uv.sh
+	pip install ".[dev]"
 
 .PHONY: install-completions
 install-completions: completions
@@ -57,9 +62,9 @@ install-completions: completions
 	install ${SELINUXOPT} -d -m 755 $(DESTDIR)${SHAREDIR}/fish/vendor_completions.d
 	install ${SELINUXOPT} -m 644 completions/fish/vendor_completions.d/ramalama.fish \
 		$(DESTDIR)${SHAREDIR}/fish/vendor_completions.d/ramalama.fish
-	install ${SELINUXOPT} -d -m 755 $(DESTDIR)${SHAREDIR}/zsh/site
-	install ${SELINUXOPT} -m 644 completions/zsh/vendor-completions/_ramalama \
-		$(DESTDIR)${SHAREDIR}/zsh/vendor-completions/_ramalama
+	install ${SELINUXOPT} -d -m 755 $(DESTDIR)${SHAREDIR}/zsh/site-functions
+	install ${SELINUXOPT} -m 644 completions/zsh/site-functions/_ramalama \
+		$(DESTDIR)${SHAREDIR}/zsh/site-functions/_ramalama
 
 .PHONY: install-shortnames
 install-shortnames:
@@ -75,8 +80,8 @@ completions:
 	mkdir -p completions/fish/vendor_completions.d
 	register-python-argcomplete --shell fish ramalama > completions/fish/vendor_completions.d/ramalama.fish
 
-	mkdir -p completions/zsh/vendor-completions
-	-register-python-argcomplete --shell zsh ramalama > completions/zsh/vendor-completions/_ramalama
+	mkdir -p completions/zsh/site-functions
+	-register-python-argcomplete --shell zsh ramalama > completions/zsh/site-functions/_ramalama
 
 .PHONY: install
 install: docs completions
@@ -110,22 +115,22 @@ ifneq (,$(wildcard /usr/bin/python3))
 endif
 
 	! grep -ri --exclude-dir ".venv" --exclude-dir "*/.venv" "#\!/usr/bin/python3" .
-	flake8  */*.py */*/*.py libexec/* bin/*
+	flake8 $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 	shellcheck *.sh */*.sh */*/*.sh
 
 .PHONY: check-format
 check-format:
-	black --check --diff */*.py */*/*.py libexec/* bin/*
-	isort --check --diff */*.py */*/*.py libexec/* bin/*
+	black --check --diff $(PROJECT_DIR) $(PYTHON_SCRIPTS)
+	isort --check --diff $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 
 .PHONY: format
 format:
-	black */*.py */*/*.py libexec/* bin/*
-	isort */*.py */*/*.py libexec/* bin/*
+	black $(PROJECT_DIR) $(PYTHON_SCRIPTS)
+	isort $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 
 .PHONY: codespell
 codespell:
-	codespell --dictionary=-  --ignore-words-list "cann" -w --skip="*/venv*"
+	codespell -w $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 
 .PHONY: test-run
 test-run:
@@ -158,13 +163,33 @@ bats-nocontainer:
 bats-docker:
 	_RAMALAMA_TEST_OPTS=--engine=docker RAMALAMA=$(CURDIR)/bin/ramalama bats -T test/system/
 
+.PHONY: bats-image
+bats-image:
+	podman inspect $(BATS_IMAGE) &> /dev/null || \
+		podman build -t $(BATS_IMAGE) -f container-images/bats/Containerfile .
+
+bats-in-container: extra-opts = --security-opt unmask=/proc/* --device /dev/net/tun
+
+%-in-container: bats-image
+	podman run -it --rm \
+		--userns=keep-id:size=200000 \
+		--security-opt label=disable \
+		--security-opt=mask=/sys/bus/pci/drivers/i915 \
+		$(extra-opts) \
+		-v $(CURDIR):/src \
+		$(BATS_IMAGE) make $*
+
 .PHONY: ci
 ci:
 	test/ci.sh
 
 .PHONY: unit-tests
 unit-tests:
-	PYTHONPATH=. pytest test/unit/
+	$(PYTEST_COMMON_CMD)
+
+.PHONY: unit-tests-verbose
+unit-tests-verbose:
+	$(PYTEST_COMMON_CMD) --full-trace --capture=tee-sys
 
 .PHONY: cov-run
 cov-run: install-cov-requirements

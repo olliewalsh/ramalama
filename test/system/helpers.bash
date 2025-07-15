@@ -248,9 +248,23 @@ function is_darwin() {
     [ "$(uname)" == "Darwin" ]
 }
 
+function is_tty() {
+    tty -s
+}
+
 function skip_if_darwin() {
     if [[ "$(uname)" == "Darwin" ]]; then
 	skip "Not supported on darwin"
+    fi
+}
+
+function is_apple_silicon() {
+    # Check if we're on macOS and have Apple Silicon (arm64)
+    if is_darwin; then
+        arch=$(uname -m)
+        [[ "$arch" == "arm64" ]]
+    else
+        return 1
     fi
 }
 

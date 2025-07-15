@@ -33,8 +33,12 @@ The default can be overridden in the ramalama.conf file.
 #### **--authfile**=*password*
 path of the authentication file for OCI registries
 
+#### **--color**
+Indicate whether or not to use color in the chat.
+Possible values are "never", "always" and "auto". (default: auto)
+
 #### **--ctx-size**, **-c**
-size of the prompt context (default: 2048, 0 = loaded from model)
+size of the prompt context. This option is also available as **--max-model-len**. Applies to llama.cpp and vllm regardless of alias (default: 2048, 0 = loaded from model)
 
 #### **--device**
 Add a host device to the container. Optional permissions parameter  can
@@ -55,7 +59,34 @@ specified without a value, the container engine checks the host environment
 for a value and set the variable only if it is set on the host.
 
 #### **--help**, **-h**
-show this help message and exit
+Show this help message and exit
+
+#### **--image**=IMAGE
+OCI container image to run with specified AI model. RamaLama defaults to using
+images based on the accelerator it discovers. For example:
+`quay.io/ramalama/ramalama`. See the table below for all default images.
+The default image tag is based on the minor version of the RamaLama package.
+Version 0.11.0 of RamaLama pulls an image with a `:0.11` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
+
+The default can be overridden in the ramalama.conf file or via the
+RAMALAMA_IMAGE environment variable. `export RAMALAMA_IMAGE=quay.io/ramalama/aiimage:1.2` tells
+RamaLama to use the `quay.io/ramalama/aiimage:1.2` image.
+
+Accelerated images:
+
+| Accelerator             | Image                      |
+| ------------------------| -------------------------- |
+|  CPU, Apple             | quay.io/ramalama/ramalama  |
+|  HIP_VISIBLE_DEVICES    | quay.io/ramalama/rocm      |
+|  CUDA_VISIBLE_DEVICES   | quay.io/ramalama/cuda      |
+|  ASAHI_VISIBLE_DEVICES  | quay.io/ramalama/asahi     |
+|  INTEL_VISIBLE_DEVICES  | quay.io/ramalama/intel-gpu |
+|  ASCEND_VISIBLE_DEVICES | quay.io/ramalama/cann      |
+|  MUSA_VISIBLE_DEVICES   | quay.io/ramalama/musa      |
+
+#### **--keep-groups**
+pass --group-add keep-groups to podman (default: False)
+If GPU device on host system is accessible to user via group access, this option leaks the groups into the container.
 
 #### **--keepalive**
 duration to keep a model loaded (e.g. 5m)
@@ -78,6 +109,9 @@ use. Using this option RamaLama will override these defaults.
 
 On Nvidia based GPU systems, RamaLama defaults to using the
 `nvidia-container-runtime`. Use this option to override this selection.
+
+#### **--prefix**
+Prefix for the user prompt (default: 🦭 > )
 
 #### **--privileged**
 By default, RamaLama containers are unprivileged (=false) and cannot, for
@@ -113,6 +147,9 @@ Add *args* to the runtime (llama.cpp or vllm) invocation.
 
 #### **--seed**=
 Specify seed rather than using random seed model interaction
+
+#### **--selinux**=*true*
+Enable SELinux container separation
 
 #### **--temp**="0.8"
 Temperature of the response from the AI Model

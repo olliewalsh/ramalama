@@ -4,20 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ramalama"
-version = "0.9.1"
+version = "0.11.0"
 description = "RamaLama is a command line tool for working with AI LLM models."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
 keywords = ["ramalama", "llama", "AI"]
 dependencies = [
-  "argcomplete"
+  "argcomplete",
 ]
 maintainers = [
    { name="Dan Walsh", email = "dwalsh@redhat.com" },
    { name="Eric Curtin", email = "ecurtin@redhat.com" },
 ]
 
+[project.license]
+text = "MIT"
 
 [project.optional-dependencies]
 dev = [
@@ -26,10 +27,12 @@ dev = [
     "black~=25.0",
     "codespell~=2.0",
     "flake8~=7.0",
-    "huggingface_hub~=0.32.4",
+    "huggingface_hub~=0.33.0",
+    "hypothesis>=6.135.26",
     "isort~=6.0",
     "pytest~=8.3",
-    "wheel~=0.45.0"
+    "wheel~=0.45.0",
+    "mypy",
 ]
 
 cov = [
@@ -55,44 +58,56 @@ ramalama = "ramalama.cli:main"
 
 [tool.setuptools]
 include-package-data = true
+license-files = ["LICENSE"]
 
 [tool.black]
 line-length = 120
 skip-string-normalization = true
 preview = true
-target-version = ["py36"]
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.tox
-  | \.venv
-  | \.history
-  | build
-  | dist
-  | docs
-  | hack
-  | venv
-)/
-'''
+target-version = ["py310", "py311", "py312", "py313"]
+extend-exclude = "(.history|build|dist|docs|hack)"
 
 [tool.isort]
 profile = "black"
 line_length = 120
+skip = [".venv", "venv"]
 
-[tool.flake8]
-max-line-length = 120
+[tool.codespell]
+skip = ["build","ramalama.egg-info", "logos", ".git", "venv", ".venv"]
+dictionary = ".codespelldict"
+ignore-words-list = ["cann", "clos", "creat", "ro", "hastable", "shouldnot", "mountns", "passt" ,"assertin"]
+check-hidden = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+include = ["\\.pyi?$"]
+exclude = [
+  "/\\.git",
+  "/\\.tox",
+  "/\\.venv",
+  "/\\.history",
+  "/build",
+  "/dist",
+  "/docs",
+  "/hack",
+  "/venv"
+]
+
+[tool.ruff.format]
+preview = true
+quote-style = "preserve"
 
 [tool.pytest.ini_options]
 testpaths = ["."]
 log_cli = true
-log_cli_level = "DEBUG"
+log_cli_level = "WARN"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
 
 [tool.setuptools.packages.find]
-include = ["ramalama"]
+include = ["ramalama", "ramalama.*"]
 
 [tool.setuptools.data-files]
 "share/ramalama" = ["shortnames/shortnames.conf"]
@@ -100,11 +115,6 @@ include = ["ramalama"]
 "share/man/man5" = ["docs/*.5"]
 "share/man/man7" = ["docs/*.7"]
 "share/bash-completion/completions" = ["completions/bash-completion/completions/*"]
-"share/zsh/vendor-completions" = ["completions/zsh/vendor-completions/*"]
+"share/zsh/site-functions" = ["completions/zsh/site-functions/*"]
 "share/fish/vendor_completions.d" = ["completions/fish/vendor_completions.d/*"]
-"libexec/ramalama" = [
-  "libexec/ramalama/ramalama-client-core",
-  "libexec/ramalama/ramalama-run-core",
-  "libexec/ramalama/ramalama-serve-core",
-]
 

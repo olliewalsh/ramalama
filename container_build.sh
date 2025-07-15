@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-RAMALAMA_DIR=${PWD}
-
 available() {
   command -v "$1" >/dev/null
 }
@@ -29,21 +27,13 @@ add_build_platform() {
 
 
   conman_build+=("--platform" "$platform")
-  case $conman_bin in
-    podman)
-      conman_build+=("--volume=${RAMALAMA_DIR}:/run/ramalama")
-      conman_build+=("--security-opt=label=disable")
-      ;;
-    docker)
-      ;;
-  esac
   if [ -n "$version" ]; then
       conman_build+=("--build-arg" "VERSION=$version")
       conman_build+=("-t" "$REGISTRY_PATH/${target}-${version}")
   else
       conman_build+=("-t" "$REGISTRY_PATH/${target}")
   fi
-  conman_build+=("-f" "${target}/Containerfile" ".")
+  conman_build+=("-f" "container-images/${target}/Containerfile" ".")
 }
 
 rm_container_image() {
@@ -58,14 +48,10 @@ add_entrypoint() {
         tag=$tag-$4
     fi
     tag=$tag-$3
-     containerfile=$(mktemp)
-    cat > "${containerfile}" <<EOF
-FROM $2
-ENTRYPOINT [ "/usr/bin/$3.sh" ]
-EOF
-echo "$1 build ${nocache} -t $tag -f ${containerfile} ."
-eval "$1 build ${nocache} -t $tag -f ${containerfile} ."
-rm "${containerfile}"
+    containerfile="container-images/common/Containerfile.entrypoint"
+    build_args=("--build-arg" "PARENT=$2" "--build-arg" "ENTRYPOINT=/usr/bin/${3}.sh")
+    echo "$1 build ${nocache} ${build_args[*]} -t $tag -f ${containerfile} ."
+    eval "$1 build ${nocache} ${build_args[*]} -t $tag -f ${containerfile} ."
 }
 
 add_rag() {
@@ -73,7 +59,8 @@ add_rag() {
     if [ -n "$3" ]; then
         tag=$tag-$3
     fi
-    containerfile=$(mktemp)
+    tag=$tag-rag
+    containerfile="container-images/common/Containerfile.rag"
     GPU=cpu
     case $2 in
 	cuda)
@@ -89,18 +76,9 @@ add_rag() {
 	    GPU=cpu
 	    ;;
     esac
-    cat > "${containerfile}" <<EOF
-ARG REGISTRY_PATH=quay.io/ramalama
-FROM ${REGISTRY_PATH}/$2
-
-COPY --chmod=755 ../scripts/ /usr/bin/
-USER root
-RUN /usr/bin/build_rag.sh ${GPU}
-ENTRYPOINT []
-EOF
-    echo "$1 build ${nocache} -t ${REGISTRY_PATH}/$tag-rag -f ${containerfile} ."
-    eval "$1 build ${nocache} -t ${REGISTRY_PATH}/$tag-rag -f ${containerfile} ."
-    rm "${containerfile}"
+    build_args=("--build-arg" "PARENT=$2" "--build-arg" "GPU=$GPU")
+    echo "$1 build ${nocache} ${build_args[*]} -t $tag -f ${containerfile} ."
+    eval "$1 build ${nocache} ${build_args[*]} -t $tag -f ${containerfile} ."
 }
 
 add_entrypoints() {
@@ -111,13 +89,11 @@ add_entrypoints() {
 build() {
   local target=${1}
   local version=${3:-}
-  cd "container-images/"
   local conman_build=("${conman[@]}")
   local conman_show_size=("${conman[@]}" "images" "--filter" "reference=$REGISTRY_PATH/${target}")
   if [ "$dryrun" == "-d" ]; then
       add_build_platform
       echo "${conman_build[@]}"
-      cd - > /dev/null
       return 0
   fi
 
@@ -129,12 +105,14 @@ build() {
       echo "${conman_show_size[@]}"
       "${conman_show_size[@]}"
       case ${target} in
-	  ramalama-cli | llama-stack | openvino)
+	  ramalama-cli | llama-stack | openvino | bats)
 	  ;;
 	  *)
-	      add_entrypoints "${conman[@]}" "${REGISTRY_PATH}"/"${target}" "${version}"
-	      add_rag "${conman[@]}" "${target}" "${version}"
-	      rm_container_image
+	      if [ "${build_all}" -eq 1 ]; then
+		  add_entrypoints "${conman[@]}" "${REGISTRY_PATH}"/"${target}" "${version}"
+		  add_rag "${conman[@]}" "${REGISTRY_PATH}"/"${target}" "${version}"
+		  rm_container_image
+	      fi
       esac
       ;;
     push)
@@ -149,8 +127,6 @@ build() {
       return 1
       ;;
   esac
-
-  cd - > /dev/null
 }
 
 determine_platform() {
@@ -199,6 +175,10 @@ parse_arguments() {
         nocache=""
         shift
         ;;
+      -s) # Only build initial image
+        build_all=0
+        shift
+        ;;
       -v)
         version="$2"
         shift
@@ -221,10 +201,10 @@ process_all_targets() {
 
   # build ramalama container image first, as other images inherit from it
   build "ramalama" "$command"
-  for i in container-images/*; do
+  for i in ./container-images/*; do
     i=$(basename "$i")
     # skip these directories
-    if [[ "$i" =~ ^(scripts|ramalama)$ ]]; then
+    if [[ "$i" =~ ^(scripts|ramalama|common)$ ]]; then
       continue
     fi
 
@@ -292,6 +272,7 @@ main() {
   local target=""
   local command=""
   local dryrun=""
+  local build_all=1
   local rm_after_build="false"
   local ci="false"
   local version=""
