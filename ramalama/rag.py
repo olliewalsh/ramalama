@@ -65,8 +65,9 @@ COPY {src} /vector.db
         parsed = urlparse(path)
         if parsed.scheme in ["file", ""] and parsed.netloc == "":
             if os.path.exists(parsed.path):
-                fpath = os.path.realpath(parsed.path)
-                self.engine.add(["-v", f"{fpath}:{INPUT_DIR}/{fpath}:ro,z"])
+                fpath = os.path.realpath(parsed.path.rstrip("/"))
+                input_name = os.path.basename(fpath)
+                self.engine.add(["-v", f"{fpath}:{INPUT_DIR}/{input_name}:ro,z"])
             else:
                 raise ValueError(f"{path} does not exist")
             return
@@ -74,11 +75,11 @@ COPY {src} /vector.db
 
     def generate(self, args):
         args.nocapdrop = True
-        self.engine = Engine(args)
         if not args.container:
             raise KeyError("rag command requires a container. Can not be run with --nocontainer option.")
         if not args.engine or args.engine == "":
             raise KeyError("rag command requires a container. Can not be run without a container engine.")
+        self.engine = Engine(args)
 
         tmpdir = "."
         if not os.access(tmpdir, os.W_OK):
@@ -113,7 +114,8 @@ COPY {src} /vector.db
 
             self.engine.add(["-e", f"{k}={v}"])
 
-        self.engine.add([rag_image(args.image)])
+        image = args.image if getattr(args, "image_override", False) else rag_image(args.image)
+        self.engine.add([image])
         self.engine.add(["doc2rag", "--format", args.format, "/output", INPUT_DIR])
         if args.ocr:
             self.engine.add(["--ocr"])

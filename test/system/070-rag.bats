@@ -15,7 +15,7 @@ load helpers
 
     FILE=README.md
     run_ramalama --dryrun rag $FILE quay.io/ramalama/myrag:1.2
-    is "$output" ".*-v ${PWD}/$FILE:/docs/$PWD/$FILE" "Expected to see file volume mounted in"
+    is "$output" ".*-v ${PWD}/$FILE:/docs/$FILE" "Expected to see file volume mounted in"
     is "$output" ".*doc2rag --format qdrant /output /docs " "Expected to doc2rag command"
     is "$output" ".*--pull missing" "only pull if missing"
 
@@ -25,7 +25,7 @@ load helpers
 
     FILE_URL=file://${PWD}/README.md
     run_ramalama --dryrun rag $FILE_URL quay.io/ramalama/myrag:1.2
-    is "$output" ".*-v ${PWD}/$FILE:/docs/$PWD/$FILE" "Expected to see file volume mounted in"
+    is "$output" ".*-v ${PWD}/$FILE:/docs/$FILE" "Expected to see file volume mounted in"
 
     FILE=BOGUS
     run_ramalama 22 --dryrun rag $FILE quay.io/ramalama/myrag:1.2
@@ -51,6 +51,8 @@ load helpers
        RAMALAMA_CONFIG=/dev/null run_ramalama --dryrun run --rag quay.io/ramalama/myrag:1.2 ollama://smollm:135m
        is "$output" ".*--pull newer.*" "Expected to use --pull newer"
     fi
+    run_ramalama --image quay.io/ramalama/bogus --dryrun run --rag quay.io/ramalama/myrag:1.2 ollama://smollm:135m
+    assert "$output" !~ ".*quay.io/ramalama/bogus-rag.*" "Expected to not use -rag image"
 
     run_ramalama info
     engine=$(echo "$output" | jq --raw-output '.Engine.Name')

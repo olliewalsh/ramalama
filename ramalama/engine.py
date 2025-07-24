@@ -162,7 +162,7 @@ class Engine:
         dry_run(self.exec_args)
 
     def run(self):
-        run_cmd(self.exec_args)
+        run_cmd(self.exec_args, stdout=None)
 
     def exec(self, stdout2null: bool = False, stderr2null: bool = False):
         exec_cmd(self.exec_args, stdout2null, stderr2null)
@@ -216,7 +216,11 @@ def containers(args):
 
     conman_args = [conman, "ps", "-a", "--filter", "label=ai.ramalama"]
     if getattr(args, "noheading", False):
-        conman_args += ["--noheading"]
+        if conman == "docker" and not args.format:
+            # implement --noheading by using --format
+            conman_args += ["--format={{.ID}} {{.Image}} {{.Command}} {{.CreatedAt}} {{.Status}} {{.Ports}} {{.Names}}"]
+        else:
+            conman_args += ["--noheading"]
 
     if getattr(args, "notrunc", False):
         conman_args += ["--no-trunc"]

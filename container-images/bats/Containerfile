@@ -1,12 +1,11 @@
 FROM quay.io/fedora/fedora:42
 
 ENV HOME=/tmp \
-    XDG_RUNTIME_DIR=/tmp \
-    STORAGE_DRIVER=vfs
+    XDG_RUNTIME_DIR=/tmp
 WORKDIR /src
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
-RUN dnf -y install make bats jq iproute podman openssl httpd-tools \
+RUN dnf -y install make bats jq iproute podman openssl httpd-tools diffutils \
     python3-huggingface-hub \
     $([ $(uname -m) == "x86_64" ] && echo ollama) \
     # for validate and unit-tests
@@ -26,4 +25,6 @@ RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp && \
 
 COPY container-images/bats/entrypoint.sh /usr/bin
 COPY container-images/bats/containers.conf /etc/containers
+COPY . /src
+RUN chmod -R a+rw /src
 RUN chmod a+rw /etc/subuid /etc/subgid
