@@ -2,7 +2,7 @@
 
 # Configure Podman Machine on Mac for GPU Acceleration
 
-Leveraging GPU acceleration on a Mac with Podman requires the configurion of
+Leveraging GPU acceleration on a Mac with Podman requires the configuration of
 the `libkrun` machine provider.
 
 This can be done by either setting an environment variable or modifying the

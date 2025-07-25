@@ -27,18 +27,9 @@ RamaLama pulls AI Models from model registries. Starting a chatbot or a rest API
 
 When both Podman and Docker are installed, RamaLama defaults to Podman, The `RAMALAMA_CONTAINER_ENGINE=docker` environment variable can override this behaviour. When neither are installed RamaLama attempts to run the model with software on the local system.
 
-Note:
+Note: On MacOS systems that use Podman for containers, configure the Podman machine to use the `libkrun` machine provider. The `libkrun` provider enables containers within the Podman Machine access to the Mac's GPU. See **[ramalama-macos(7)](ramalama-macos.7.md)** for further information.
 
-On MacOS systems that use Podman for containers, configure the Podman machine
-to use the `libkrun` machine provider. The `libkrun` provider enables
-containers within the Podman Machine access to the Mac's GPU.
-See **[ramalama-macos(7)](ramalama-macos.7.md)** for further information.
-
-Note:
-
-On systems with NVIDIA GPUs, see **[ramalama-cuda(7)](ramalama-cuda.7.md)** to correctly configure the host system.
-
-Default settings for flags are defined in **[ramalama.conf(5)](ramalama.conf.5.md)**.
+Note: On systems with NVIDIA GPUs, see **[ramalama-cuda(7)](ramalama-cuda.7.md)** to correctly configure the host system. Default settings for flags are defined in **[ramalama.conf(5)](ramalama.conf.5.md)**.
 
 ## SECURITY
 
@@ -93,7 +84,7 @@ the model. The following table specifies the order which RamaLama reads the file
 | Administrators  | /etc/ramamala/shortnames.conf             |
 | Users           | $HOME/.config/ramalama/shortnames.conf    |
 
-```code
+```toml
 $ cat /usr/share/ramalama/shortnames.conf
 [shortnames]
   "tiny" = "ollama://tinyllama"

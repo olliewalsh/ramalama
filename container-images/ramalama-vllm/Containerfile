@@ -12,6 +12,6 @@ ENV UV_LINK_MODE="copy"
 
 COPY . /src/ramalama
 WORKDIR /src/ramalama
-RUN container-images/scripts/build-vllm.sh
+RUN container-images/scripts/build-vllm.sh "ramalama"
 WORKDIR /
 
