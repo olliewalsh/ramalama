@@ -341,13 +341,11 @@ class Model(ModelBase):
     def bench(self, args):
         self.ensure_model_exists(args)
         exec_args = self.build_exec_args_bench(args)
-        self.validate_args(args)
         self.execute_command(exec_args, args)
 
     def run(self, args):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
-        self.validate_args(args)
 
         args.port = compute_serving_port(args, quiet=args.debug)
         if args.container:
@@ -492,7 +490,6 @@ class Model(ModelBase):
         return exec_args
 
     def perplexity(self, args):
-        self.validate_args(args)
         self.ensure_model_exists(args)
         exec_args = self.build_exec_args_perplexity(args)
         self.execute_command(exec_args, args)
@@ -517,6 +514,8 @@ class Model(ModelBase):
         return all
 
     def ensure_model_exists(self, args):
+        self.validate_args(args)
+
         if args.dryrun or self.exists():
             return
 
@@ -550,7 +549,7 @@ class Model(ModelBase):
         # If --nocontainer=False was specified return valid
         if args.container:
             return
-        if args.privileged:
+        if getattr(args, "privileged", None):
             raise KeyError(
                 "--nocontainer and --privileged options conflict. The --privileged option requires a container."
             )
@@ -590,6 +589,8 @@ class Model(ModelBase):
             self._get_entry_model_path(args.container, args.generate, args.dryrun),
             "--no-warmup",
         ]
+        if not args.thinking:
+            exec_args += ["--reasoning-budget", "0"]
         mmproj_path = self._get_mmproj_path(args.container, args.generate, args.dryrun)
         if mmproj_path is not None:
             exec_args += ["--mmproj", mmproj_path]
@@ -707,6 +708,7 @@ class Model(ModelBase):
             self.kube(
                 (model_src_path, model_dest_path),
                 (chat_template_src_path, chat_template_dest_path),
+                (mmproj_src_path, mmproj_dest_path),
                 args,
                 exec_args,
                 args.generate.output_dir,
@@ -737,7 +739,6 @@ class Model(ModelBase):
             raise NotImplementedError(file_not_found % {"cmd": exec_args[0], "error": str(e).strip("'")})
 
     def serve(self, args, quiet=False):
-        self.validate_args(args)
         self.ensure_model_exists(args)
 
         args.port = compute_serving_port(args, quiet=quiet or args.generate)
@@ -765,14 +766,14 @@ class Model(ModelBase):
             generated_file.write(output_dir)
 
     def quadlet_kube(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
-        kube = Kube(self.model_name, model_paths, chat_template_paths, args, exec_args)
+        kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
         kube.generate().write(output_dir)
 
-        quadlet = Quadlet(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
+        quadlet = Quadlet(kube.name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
         quadlet.kube().write(output_dir)
 
-    def kube(self, model_paths, chat_template_paths, args, exec_args, output_dir):
-        kube = Kube(self.model_name, model_paths, chat_template_paths, args, exec_args)
+    def kube(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
+        kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
         kube.generate().write(output_dir)
 
     def inspect(self, args):

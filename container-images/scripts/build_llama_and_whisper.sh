@@ -1,21 +1,18 @@
 #!/bin/bash
 
 python_version() {
+  local pyversion
   pyversion=$(python3 --version)
   # $2 is empty when no Python is installed, so just install python3
   if [ -n "$pyversion" ]; then
-    string="$pyversion
+    local pystr="$pyversion
 Python 3.10"
-    if [ "$string" == "$(sort --version-sort <<<"$string")" ]; then
+    if [ "$pystr" == "$(sort --version-sort <<<"$pystr")" ]; then
       echo "python3.11"
       return
     fi
   fi
   echo "python3"
-}
-
-available() {
-  command -v "$1" >/dev/null
 }
 
 dnf_install_intel_gpu() {
@@ -58,14 +55,12 @@ dnf_install_cann() {
 }
 
 dnf_install_rocm() {
-  if [ "$containerfile" = "rocm" ]; then
-    if [ "${ID}" = "fedora" ]; then
-      dnf update -y
-      dnf install -y rocm-core-devel hipblas-devel rocblas-devel rocm-hip-devel
-    else
-      add_stream_repo "AppStream"
-      dnf install -y rocm-dev hipblas-devel rocblas-devel
-    fi
+  if [ "${ID}" = "fedora" ]; then
+    dnf update -y
+    dnf install -y rocm-core-devel hipblas-devel rocblas-devel rocm-hip-devel
+  else
+    add_stream_repo "AppStream"
+    dnf install -y rocm-dev hipblas-devel rocblas-devel
   fi
 
   rm_non_ubi_repos
@@ -74,26 +69,6 @@ dnf_install_rocm() {
 dnf_install_s390() {
   # I think this was for s390, maybe ppc also
   dnf install -y "openblas-devel"
-}
-
-add_stream_repo() {
-  local url="https://mirror.stream.centos.org/9-stream/$1/$uname_m/os/"
-  dnf config-manager --add-repo "$url"
-  url="http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-Official"
-  local file="/etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official"
-  if [ ! -e $file ]; then
-    curl --retry 8 --retry-all-errors -o $file "$url"
-    rpm --import $file
-  fi
-}
-
-rm_non_ubi_repos() {
-  local dir="/etc/yum.repos.d"
-  rm -rf $dir/mirror.stream.centos.org_9-stream_* $dir/epel*
-}
-
-is_rhel_based() { # doesn't include openEuler
-  [[ "${ID}" == "rhel" || "${ID}" == "redhat" || "${ID}" == "centos" ]]
 }
 
 dnf_install_mesa() {
@@ -111,13 +86,6 @@ dnf_install_mesa() {
   rm_non_ubi_repos
 }
 
-dnf_install_epel() {
-  local rpm_exclude_list="selinux-policy,container-selinux"
-  local url="https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
-  dnf reinstall -y "$url" || dnf install -y "$url" --exclude "${rpm_exclude_list}"
-  crb enable # this is in epel-release, can only install epel-release via url
-}
-
 # There is no ffmpeg-free package in the openEuler repository. openEuler can use ffmpeg,
 # which also has the same GPL/LGPL license as ffmpeg-free.
 dnf_install_ffmpeg() {
@@ -133,6 +101,7 @@ dnf_install_ffmpeg() {
   else
     dnf install -y ffmpeg-free
   fi
+
   rm_non_ubi_repos
 }
 
@@ -159,7 +128,7 @@ dnf_install() {
     else
       dnf_install_s390
     fi
-  elif [[ "$containerfile" =~ rocm* ]]; then
+  elif [[ "$containerfile" = rocm* ]]; then
     dnf_install_rocm
   elif [ "$containerfile" = "asahi" ]; then
     dnf_install_asahi
@@ -252,18 +221,14 @@ configure_common_flags() {
 
 clone_and_build_whisper_cpp() {
   local whisper_flags=("${common_flags[@]}")
-  # last time we tried to upgrade the whisper sha, rocm build broke
-  local whisper_cpp_sha="d682e150908e10caa4c15883c633d7902d385237"
+  local whisper_cpp_sha="d0a9d8c7f8f7b91c51d77bbaa394b915f79cde6b"
   whisper_flags+=("-DBUILD_SHARED_LIBS=OFF")
   # See: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md#compilation-options
   if [ "$containerfile" = "musa" ]; then
     whisper_flags+=("-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
   fi
 
-  git clone https://github.com/ggerganov/whisper.cpp
-  cd whisper.cpp
-  git submodule update --init --recursive
-  git reset --hard "$whisper_cpp_sha"
+  git_clone_specific_commit "https://github.com/ggerganov/whisper.cpp" "$whisper_cpp_sha"
   cmake_steps "${whisper_flags[@]}"
   mkdir -p "$install_prefix/bin"
   cd ..
@@ -274,10 +239,7 @@ clone_and_build_llama_cpp() {
   local llama_cpp_sha="3f4fc97f1d745f1d5d3c853949503136d419e6de"
   local install_prefix
   install_prefix=$(set_install_prefix)
-  git clone https://github.com/ggml-org/llama.cpp
-  cd llama.cpp
-  git submodule update --init --recursive
-  git reset --hard "$llama_cpp_sha"
+  git_clone_specific_commit "https://github.com/ggml-org/llama.cpp" "$llama_cpp_sha"
   cmake_steps "${common_flags[@]}"
   install -m 755 build/bin/rpc-server "$install_prefix"/bin/rpc-server
   cd ..
@@ -303,6 +265,27 @@ install_entrypoints() {
   fi
 }
 
+cleanup() {
+  clone_and_build_llama_cpp
+  available dnf && dnf_remove
+  rm -rf /var/cache/*dnf* /opt/rocm-*/lib/*/library/*gfx9*
+  ldconfig # needed for libraries
+}
+
+add_common_flags() {
+  common_flags+=("-DLLAMA_CURL=ON" "-DGGML_RPC=ON")
+  case "$containerfile" in
+  ramalama)
+    if [ "$uname_m" = "x86_64" ] || [ "$uname_m" = "aarch64" ]; then
+      common_flags+=("-DGGML_VULKAN=ON")
+    elif [ "$uname_m" = "s390x" ]; then
+      common_flags+=("-DGGML_VXE=ON" "-DGGML_BLAS=ON")
+      common_flags+=("-DGGML_BLAS_VENDOR=OpenBLAS")
+    fi
+    ;;
+  esac
+}
+
 main() {
   # shellcheck disable=SC1091
   source /etc/os-release
@@ -310,6 +293,9 @@ main() {
   set -ex -o pipefail
   export PYTHON
   PYTHON=$(python_version)
+
+  # shellcheck disable=SC1091
+  source container-images/scripts/lib.sh
 
   local containerfile=${1-""}
   local install_prefix
@@ -323,27 +309,15 @@ main() {
   if [ -n "$containerfile" ]; then
     install_ramalama "${install_prefix}"
   fi
-  install_entrypoints
 
+  install_entrypoints
   setup_build_env
-  if [ "$uname_m" != "s390x" ] && [ "$containerfile" != "musa" ]; then
+  if [ "$uname_m" != "s390x" ] && [ "$containerfile" != "rocm-ubi" ]; then
     clone_and_build_whisper_cpp
   fi
-  common_flags+=("-DLLAMA_CURL=ON" "-DGGML_RPC=ON")
-  case "$containerfile" in
-  ramalama)
-    if [ "$uname_m" = "x86_64" ] || [ "$uname_m" = "aarch64" ]; then
-      common_flags+=("-DGGML_VULKAN=ON")
-    elif [ "$uname_m" = "s390x" ]; then
-      common_flags+=("-DGGML_VXE=ON" "-DGGML_BLAS=ON" "-DGGML_BLAS_VENDOR=OpenBLAS")
-    fi
-    ;;
-  esac
 
-  clone_and_build_llama_cpp
-  available dnf && dnf_remove
-  rm -rf /var/cache/*dnf* /opt/rocm-*/lib/*/library/*gfx9*
-  ldconfig # needed for libraries
+  add_common_flags
+  cleanup
 }
 
 main "$@"
