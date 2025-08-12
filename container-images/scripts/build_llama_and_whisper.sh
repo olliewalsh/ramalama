@@ -74,9 +74,9 @@ dnf_install_s390() {
 dnf_install_mesa() {
   if [ "${ID}" = "fedora" ]; then
     dnf copr enable -y slp/mesa-libkrun-vulkan
-    dnf install -y mesa-vulkan-drivers-25.0.7-100.fc42 virglrenderer \
+    dnf install -y mesa-vulkan-drivers-25.0.7-101.fc42 virglrenderer \
       "${vulkan_rpms[@]}"
-    dnf versionlock add mesa-vulkan-drivers-25.0.7-100.fc42
+    dnf versionlock add mesa-vulkan-drivers-25.0.7-101.fc42
   elif [ "${ID}" = "openEuler" ]; then
     dnf install -y mesa-vulkan-drivers virglrenderer "${vulkan_rpms[@]}"
   else # virglrenderer not available on RHEL or EPEL
@@ -236,7 +236,7 @@ clone_and_build_whisper_cpp() {
 }
 
 clone_and_build_llama_cpp() {
-  local llama_cpp_sha="3f4fc97f1d745f1d5d3c853949503136d419e6de"
+  local llama_cpp_sha="1d72c841888b9450916bdd5a9b3274da380f5b36"
   local install_prefix
   install_prefix=$(set_install_prefix)
   git_clone_specific_commit "https://github.com/ggml-org/llama.cpp" "$llama_cpp_sha"
@@ -312,7 +312,7 @@ main() {
 
   install_entrypoints
   setup_build_env
-  if [ "$uname_m" != "s390x" ] && [ "$containerfile" != "rocm-ubi" ]; then
+  if [ "$uname_m" != "s390x" ]; then
     clone_and_build_whisper_cpp
   fi
 

@@ -7,6 +7,7 @@ SHAREDIR ?= ${PREFIX}/share
 PYTHON ?= $(shell command -v python3 python|head -n1)
 DESTDIR ?= /
 PATH := $(PATH):$(HOME)/.local/bin
+MYPIP ?= pip
 IMAGE ?= ramalama
 PROJECT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PYTHON_SCRIPTS := $(shell grep -lEr "^\#\!\s*/usr/bin/(env +)?python(3)?(\s|$$)" --exclude-dir={.venv,venv} $(PROJECT_DIR) || true)
@@ -43,16 +44,16 @@ help:
 	@echo
 
 install-detailed-cov-requirements:
-	pip install ".[cov-detailed]"
+	${MYPIP} install ".[cov-detailed]"
 
 .PHONY: install-cov-requirements
 install-cov-requirements:
-	pip install ".[cov]"
+	${MYPIP} install ".[cov]"
 
 .PHONY: install-requirements
 install-requirements:
 	./install-uv.sh
-	pip install ".[dev]"
+	${MYPIP} install ".[dev]"
 
 .PHONY: install-completions
 install-completions: completions
@@ -86,7 +87,7 @@ completions:
 .PHONY: install
 install: docs completions
 	RAMALAMA_VERSION=$(RAMALAMA_VERSION) \
-	pip install . --no-deps --root $(DESTDIR) --prefix ${PREFIX}
+	${MYPIP} install . --no-deps --root $(DESTDIR) --prefix ${PREFIX}
 
 .PHONY: build
 build:
@@ -111,9 +112,8 @@ docs:
 .PHONY: lint
 lint:
 ifneq (,$(wildcard /usr/bin/python3))
-	/usr/bin/python3 -m compileall -q .
+	/usr/bin/python3 -m compileall -q -x '\.venv' .
 endif
-
 	! grep -ri --exclude-dir ".venv" --exclude-dir "*/.venv" "#\!/usr/bin/python3" .
 	flake8 $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 	shellcheck *.sh */*.sh */*/*.sh
@@ -144,11 +144,14 @@ ifeq ($(OS),Linux)
 	hack/xref-helpmsgs-manpages
 endif
 
-.PHONY: pypi
-pypi:   clean
+.PHONY: pypi-build
+pypi-build:   clean
 	make docs
 	python3 -m build --sdist
 	python3 -m build --wheel
+
+.PHONY: pypi
+pypi: pypi-build
 	python3 -m twine upload dist/*
 
 .PHONY: bats

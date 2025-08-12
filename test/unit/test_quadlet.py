@@ -17,6 +17,7 @@ class Args:
         host: str = "0.0.0.0",
         env: list = [],
         MODEL: Optional[str] = None,
+        add_to_unit=None,
     ):
         self.name = name
         self.rag = rag
@@ -26,6 +27,7 @@ class Args:
         self.image = "testimage"
         if MODEL is not None:
             self.MODEL = MODEL
+        self.add_to_unit = add_to_unit
 
 
 class Input:
@@ -71,7 +73,7 @@ DATA_PATH = Path(__file__).parent / "data" / "test_quadlet"
             Input(
                 model_name="tinyllama",
                 model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
-                model_dest_name="tinyllama",
+                model_dest_name="/mnt/models/tinyllama",
             ),
             DATA_PATH / "empty",
         ),
@@ -79,7 +81,7 @@ DATA_PATH = Path(__file__).parent / "data" / "test_quadlet"
             Input(
                 model_name="tinyllama",
                 model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
-                model_dest_name="tinyllama",
+                model_dest_name="/mnt/models/tinyllama",
                 image="testimage",
             ),
             DATA_PATH / "basic",
@@ -88,7 +90,7 @@ DATA_PATH = Path(__file__).parent / "data" / "test_quadlet"
             Input(
                 model_name="tinyllama",
                 model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
-                model_dest_name="tinyllama",
+                model_dest_name="/mnt/models/tinyllama",
                 image="testimage",
                 args=Args(port="2020"),
             ),
@@ -108,7 +110,7 @@ DATA_PATH = Path(__file__).parent / "data" / "test_quadlet"
             Input(
                 model_name="modelfromstore",
                 model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
-                model_dest_name="longpathtoablobsha",
+                model_dest_name="/mnt/models/modelfromstore",
                 image="testimage",
                 args=Args(MODEL="modelfromstore"),
                 model_file_exists=True,
@@ -119,12 +121,12 @@ DATA_PATH = Path(__file__).parent / "data" / "test_quadlet"
             Input(
                 model_name="modelfromstore_ct",
                 model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
-                model_dest_name="longpathtoablobsha",
+                model_dest_name="/mnt/models/modelfromstore_ct",
                 image="testimage",
                 args=Args(MODEL="modelfromstore_ct"),
                 model_file_exists=True,
                 chat_template_src_blob="sha256-c21bc76d14f19f6552bfd8bbf4e5f57494169b902c73aa12ce3ce855466477fa",
-                chat_template_dest_name="chat_template",
+                chat_template_dest_name="/mnt/models/chat_template",
                 chat_template_file_exists=True,
             ),
             DATA_PATH / "modelfromstore_ct",
@@ -133,15 +135,69 @@ DATA_PATH = Path(__file__).parent / "data" / "test_quadlet"
             Input(
                 model_name="modelfromstore_mmproj",
                 model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
-                model_dest_name="longpathtoablobsha",
+                model_dest_name="/mnt/models/modelfromstore_mmproj",
                 image="testimage",
                 args=Args(MODEL="modelfromstore_mmproj"),
+                model_file_exists=True,
+                mmproj_src_blob="sha256-c21bc76d14f19f6552bfd8bbf4e5f57494169b902c73aa12ce3ce855466477fa",
+                mmproj_dest_name="/mnt/models/modelfromstore_mmproj.mmproj",
+                mmproj_file_exists=True,
+            ),
+            DATA_PATH / "modelfromstore_mmproj",
+        ),
+        (
+            Input(
+                model_name="modelfromstore_add_to_unit",
+                model_src_blob="sha256-2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
+                model_dest_name="longpathtoablobsha",
+                image="testimage",
+                args=Args(
+                    MODEL="modelfromstore_add_to_unit",
+                    add_to_unit=[
+                        "section1:key0:value0",
+                        "section1:key1:valu:e:1",
+                        "section1:key2:value1:",
+                        "Container:test:dummy",
+                    ],
+                ),
                 model_file_exists=True,
                 mmproj_src_blob="sha256-c21bc76d14f19f6552bfd8bbf4e5f57494169b902c73aa12ce3ce855466477fa",
                 mmproj_dest_name="model.mmproj",
                 mmproj_file_exists=True,
             ),
-            DATA_PATH / "modelfromstore_mmproj",
+            DATA_PATH / "modelfromstore_add_to_unit",
+        ),
+        (
+            Input(
+                model_name="oci-model",
+                model_src_blob="oci://registry.example.com/model:latest",
+                model_dest_name="/mnt/models/model.file",
+                image="testimage",
+                model_file_exists=False,
+            ),
+            DATA_PATH / "oci_basic",
+        ),
+        (
+            Input(
+                model_name="oci-model-port",
+                model_src_blob="oci://registry.example.com/model:latest",
+                model_dest_name="/mnt/models/model.file",
+                image="testimage",
+                args=Args(port="8080"),
+                model_file_exists=False,
+            ),
+            DATA_PATH / "oci_port",
+        ),
+        (
+            Input(
+                model_name="oci-model-rag",
+                model_src_blob="oci://registry.example.com/model:latest",
+                model_dest_name="/mnt/models/model.file",
+                image="testimage",
+                args=Args(rag="oci://registry.example.com/rag:latest"),
+                model_file_exists=False,
+            ),
+            DATA_PATH / "oci_rag",
         ),
     ],
 )

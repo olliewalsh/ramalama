@@ -3,19 +3,19 @@ import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, TypeAlias
 
 from ramalama.common import available
-from ramalama.layered_config import LayeredMixin, deep_merge
+from ramalama.layered_config import LayeredMixin
 from ramalama.toml_parser import TOMLParser
 
-PathStr = str
+PathStr: TypeAlias = str
 DEFAULT_PORT_RANGE: tuple[int, int] = (8080, 8090)
 DEFAULT_PORT: int = DEFAULT_PORT_RANGE[0]
-DEFAULT_IMAGE = "quay.io/ramalama/ramalama"
-SUPPORTED_ENGINES = Literal["podman", "docker"] | PathStr
-SUPPORTED_RUNTIMES = Literal["llama.cpp", "vllm", "mlx"]
-COLOR_OPTIONS = Literal["auto", "always", "never"]
+DEFAULT_IMAGE: str = "quay.io/ramalama/ramalama"
+SUPPORTED_ENGINES: TypeAlias = Literal["podman", "docker"] | PathStr
+SUPPORTED_RUNTIMES: TypeAlias = Literal["llama.cpp", "vllm", "mlx"]
+COLOR_OPTIONS: TypeAlias = Literal["auto", "always", "never"]
 
 
 def get_default_engine() -> SUPPORTED_ENGINES | None:
@@ -60,7 +60,7 @@ class UserConfig:
 class RamalamaSettings:
     """These settings are not managed directly by the user"""
 
-    config_file: str | None = None
+    config_files: list[str] | None = None
 
 
 @dataclass
@@ -125,40 +125,39 @@ def load_file_config() -> dict[str, Any]:
     if config_path and os.path.exists(config_path):
         config = parser.parse_file(config_path)
         config = config.get("ramalama", {})
-        config['settings'] = {'config_file': config_path}
+        config['settings'] = {'config_files': [config_path]}
         return config
 
     config = {}
-    config_paths = [
+    default_config_paths = [
         "/usr/share/ramalama/ramalama.conf",
         "/usr/local/share/ramalama/ramalama.conf",
         "/etc/ramalama/ramalama.conf",
         os.path.expanduser(os.path.join(os.getenv("XDG_CONFIG_HOME", "~/.config"), "ramalama", "ramalama.conf")),
     ]
 
-    config_path = None
-    for path in config_paths:
+    config_paths = []
+    for path in default_config_paths:
         if os.path.exists(path):
-            config = parser.parse_file(path)
-
+            config_paths.append(str(path))
+            parser.parse_file(path)
         path_str = f"{path}.d"
         if os.path.isdir(path_str):
             for conf_file in sorted(Path(path_str).glob("*.conf")):
-                deep_merge(config, parser.parse_file(conf_file))
-
-        if config:
-            config = config.get('ramalama', {})
-            config['settings'] = {'config_file': config_path}
-            return config
-
-    return {}
+                config_paths.append(str(conf_file))
+                parser.parse_file(conf_file)
+    config = parser.data
+    if config:
+        config = config.get('ramalama', {})
+        config['settings'] = {'config_files': config_paths}
+    return config
 
 
 def load_env_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     if env is None:
         env = os.environ
 
-    config = {}
+    config: dict[str, Any] = {}
     for k, v in env.items():
         if not k.startswith("RAMALAMA"):
             continue

@@ -22,8 +22,11 @@ class Quadlet:
         )
         self.src_mmproj_path, self.dest_mmproj_path = mmproj_path if mmproj_path is not None else ("", "")
 
-        self.ai_image = model_name
-        self.src_model_path = self.src_model_path.removeprefix("oci://")
+        if self.src_model_path.startswith("oci://"):
+            self.src_model_path = self.src_model_path.removeprefix("oci://")
+            self.ai_image = self.src_model_path
+        else:
+            self.ai_image = model_name
         if getattr(args, "name", None):
             self.name = args.name
         else:
@@ -67,7 +70,10 @@ class Quadlet:
             if not getattr(self.args, "nocapdrop", False):
                 quadlet_file.add("Container", "DropCapability", "all")
                 quadlet_file.add("Container", "NoNewPrivileges", "true")
-
+        if add_to_units := getattr(self.args, "add_to_unit", None):
+            for unit in add_to_units:
+                section, key, value = unit.split(":", 2)
+                quadlet_file.add(section, key, value)
         self._gen_chat_template_volume(quadlet_file)
         self._gen_mmproj_volume(quadlet_file)
         self._gen_env(quadlet_file)

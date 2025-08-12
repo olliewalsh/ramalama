@@ -228,19 +228,19 @@ function not_docker() {
 
 function skip_if_nocontainer() {
     if [[ "${_RAMALAMA_TEST_OPTS}" == "--nocontainer" ]]; then
-	skip "Not supported with --nocontainer"
+        skip "Not supported with --nocontainer"
     fi
 }
 
 function skip_if_notlocal() {
     if [[ "${_RAMALAMA_TEST}" != "local" ]]; then
-	skip "Not supported unless --local"
+        skip "Not supported unless --local"
     fi
 }
 
 function skip_if_docker() {
     if [[ "${_RAMALAMA_TEST_OPTS}" == "--engine=docker" ]]; then
-	skip "Not supported with ----engine=docker"
+        skip "Not supported with --engine=docker"
     fi
 }
 
@@ -254,7 +254,7 @@ function is_tty() {
 
 function skip_if_darwin() {
     if [[ "$(uname)" == "Darwin" ]]; then
-	skip "Not supported on darwin"
+        skip "Not supported on darwin"
     fi
 }
 
@@ -279,6 +279,13 @@ function skip_if_no_ollama() {
     if ! command -v ollama 2>&1 >/dev/null
     then
         skip "Not supported without ollama"
+    fi
+}
+
+function skip_if_no_llama_bench() {
+    if ! command -v llama-bench 2>&1 >/dev/null
+    then
+        skip "Not supported without llama-bench"
     fi
 }
 

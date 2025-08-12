@@ -64,7 +64,7 @@ class HFStyleRepository(ABC):
         self.name = name
         self.organization = organization
         self.tag = tag
-        self.headers = {}
+        self.headers: dict = {}
         self.blob_url = None
         self.model_filename = None
         self.model_hash = None
@@ -238,7 +238,7 @@ class HFStyleRepoModel(Model, ABC):
                 raise KeyError(f"Failed to pull model: {str(e)}")
 
             # Create temporary directory for downloading via CLI
-            with tempfile.TemporaryDirectory() as tempdir:
+            with tempfile.TemporaryDirectory(prefix="tmp_hfcli_", dir=self.model_store.base_path) as tempdir:
                 model = f"{organization}/{name}"
                 conman_args = self.get_cli_download_args(tempdir, model)
                 run_cmd(conman_args)

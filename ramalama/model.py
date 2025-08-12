@@ -3,8 +3,10 @@ import platform
 import random
 import shlex
 import socket
+import subprocess
 import sys
 import time
+from abc import ABC, abstractmethod
 from typing import Optional
 
 import ramalama.chat as chat
@@ -22,7 +24,7 @@ from ramalama.common import (
 )
 from ramalama.config import CONFIG, DEFAULT_PORT, DEFAULT_PORT_RANGE
 from ramalama.console import should_colorize
-from ramalama.engine import Engine, dry_run
+from ramalama.engine import Engine, dry_run, wait_for_healthy
 from ramalama.kube import Kube
 from ramalama.logger import logger
 from ramalama.model_inspect.base_info import ModelInfoBase
@@ -54,7 +56,6 @@ $(error)s"""
 
 
 class NoRefFileFound(Exception):
-
     def __init__(self, model: str, *args):
         super().__init__(*args)
 
@@ -74,7 +75,10 @@ def trim_model_name(model):
     return model
 
 
-class ModelBase:
+class ModelBase(ABC):
+    model: str
+    type: str
+
     def __not_implemented_error(self, param):
         return NotImplementedError(f"ramalama {param} for '{type(self).__name__}' not implemented")
 
@@ -90,24 +94,31 @@ class ModelBase:
     def push(self, source_model, args):
         raise self.__not_implemented_error("push")
 
+    @abstractmethod
     def remove(self, args):
         raise self.__not_implemented_error("rm")
 
+    @abstractmethod
     def bench(self, args):
         raise self.__not_implemented_error("bench")
 
+    @abstractmethod
     def run(self, args):
         raise self.__not_implemented_error("run")
 
+    @abstractmethod
     def perplexity(self, args):
         raise self.__not_implemented_error("perplexity")
 
+    @abstractmethod
     def serve(self, args):
         raise self.__not_implemented_error("serve")
 
+    @abstractmethod
     def exists(self) -> bool:
         raise self.__not_implemented_error("exists")
 
+    @abstractmethod
     def inspect(self, args):
         raise self.__not_implemented_error("inspect")
 
@@ -115,15 +126,14 @@ class ModelBase:
 class Model(ModelBase):
     """Model super class"""
 
-    model = ""
-    type = "Model"
+    type: str = "Model"
 
-    def __init__(self, model, model_store_path):
+    def __init__(self, model: str, model_store_path: str):
         self.model = model
 
-        split = self.model.rsplit("/", 1)
-        self.directory = split[0] if len(split) > 1 else ""
-        self.filename = split[1] if len(split) > 1 else split[0]
+        split: list[str] = self.model.rsplit("/", 1)
+        self.directory: str = split[0] if len(split) > 1 else ""
+        self.filename: str = split[1] if len(split) > 1 else split[0]
 
         self._model_name: str
         self._model_tag: str
@@ -184,6 +194,12 @@ class Model(ModelBase):
         if dry_run:
             return "/path/to/model"
 
+        if self.model_type == 'oci':
+            if use_container or should_generate:
+                return os.path.join(MNT_DIR, 'model.file')
+            else:
+                return f"oci://{self.model}"
+
         ref_file = self.model_store.get_ref_file(self.model_tag)
         if ref_file is None or not ref_file.model_files:
             raise NoRefFileFound(self.model)
@@ -210,6 +226,9 @@ class Model(ModelBase):
         if dry_run:
             return ""
 
+        if self.model_type == 'oci':
+            return None
+
         ref_file = self.model_store.get_ref_file(self.model_tag)
         if ref_file is None:
             raise NoRefFileFound(self.model)
@@ -230,6 +249,9 @@ class Model(ModelBase):
         """
         if dry_run:
             return ""
+
+        if self.model_type == 'oci':
+            return None
 
         ref_file = self.model_store.get_ref_file(self.model_tag)
         if ref_file is None:
@@ -274,6 +296,12 @@ class Model(ModelBase):
                 "--name",
                 name,
                 "--env=HOME=/tmp",
+                "--health-cmd",
+                f"curl --fail http://127.0.0.1:{args.port}/models",
+                "--health-interval=3s",
+                "--health-retries=10",
+                "--health-timeout=3s",
+                "--health-start-period=3s",
                 "--init",
             ]
         )
@@ -322,6 +350,12 @@ class Model(ModelBase):
         if args.dryrun:
             return
 
+        if self.model_type == 'oci':
+            if not self.engine.use_podman:
+                raise NotImplementedError("Serving OCI models via image mount is only supported with Podman.")
+            self.engine.add([f"--mount=type=image,src={self.model},destination={MNT_DIR},subpath=/models,rw=false"])
+            return None
+
         ref_file = self.model_store.get_ref_file(self.model_tag)
         if ref_file is None:
             raise NoRefFileFound(self.model)
@@ -353,6 +387,7 @@ class Model(ModelBase):
 
         args.noout = not args.debug
 
+        self.ensure_model_exists(args)
         pid = os.fork()
         if pid == 0:
             # Child process - start the server
@@ -392,6 +427,14 @@ class Model(ModelBase):
         if status != 0:
             raise ValueError(f"Failed to serve model {self.model_name}, for ramalama run command")
 
+        if not args.dryrun and args.engine == "podman":
+            try:
+                wait_for_healthy(args)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                logger.error(f"Failed to serve model {self.model_name}, for ramalama run command")
+                logger.error(f"Try `ramalama serve {self.model_name}` for failure logs")
+                raise
+
         args.ignore = getattr(args, "dryrun", False)
         for i in range(6):
             try:
@@ -417,7 +460,7 @@ class Model(ModelBase):
                     chat.chat(args)
                     break
                 else:
-                    logger.debug(f"MLX server not ready, waiting... (attempt {i+1}/{max_retries})")
+                    logger.debug(f"MLX server not ready, waiting... (attempt {i + 1}/{max_retries})")
                     time.sleep(3)
                     continue
 
@@ -426,7 +469,7 @@ class Model(ModelBase):
                     perror(f"Error: Failed to connect to MLX server after {max_retries} attempts: {e}")
                     self._cleanup_server_process(args.pid2kill)
                     raise e
-                logger.debug(f"Connection attempt failed, retrying... (attempt {i+1}/{max_retries}): {e}")
+                logger.debug(f"Connection attempt failed, retrying... (attempt {i + 1}/{max_retries}): {e}")
                 time.sleep(3)
 
         args.initial_connection = False
@@ -686,7 +729,6 @@ class Model(ModelBase):
         return exec_args
 
     def generate_container_config(self, args, exec_args):
-
         # Get the blob paths (src) and mounted paths (dest)
         model_src_path = self._get_entry_model_path(False, False, args.dryrun)
         chat_template_src_path = self._get_chat_template_path(False, False, args.dryrun)
@@ -776,7 +818,7 @@ class Model(ModelBase):
         kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
         kube.generate().write(output_dir)
 
-    def inspect(self, args):
+    def inspect(self, args) -> None:
         self.ensure_model_exists(args)
 
         model_name = self.filename

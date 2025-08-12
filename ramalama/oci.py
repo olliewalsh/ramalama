@@ -130,10 +130,11 @@ def list_models(args: EngineArgType):
 
 
 class OCI(Model):
-    def __init__(self, model, model_store_path, conman, ignore_stderr=False):
+    type = "OCI"
+
+    def __init__(self, model: str, model_store_path: str, conman: str, ignore_stderr: bool = False):
         super().__init__(model, model_store_path)
 
-        self.type = "OCI"
         if not conman:
             raise ValueError("RamaLama OCI Images requires a container engine")
 
@@ -187,7 +188,7 @@ class OCI(Model):
         if is_car:
             content += f"FROM {args.carimage}\n"
         else:
-            content += f"FROM {args.carimage} as builder\n"
+            content += f"FROM {args.carimage} AS builder\n"
 
         if has_gguf:
             content += (
@@ -204,7 +205,8 @@ RUN ln -s /models/{model_name}-{args.gguf}.gguf model.file
 RUN rm -rf /{model_name}-f16.gguf /models/{model_name}
 """
         else:
-            content += f"RUN mkdir -p /models; cd /models; ln -s {model_name} model.file\n"
+            name = ref_file.model_files[0].name if ref_file.model_files else model_name
+            content += f"""RUN mkdir -p /models; cd /models; ln -s {model_name}/{name} model.file\n"""
 
         if not is_car:
             content += "\nFROM scratch\n"
@@ -241,6 +243,9 @@ RUN rm -rf /{model_name}-f16.gguf /models/{model_name}
         with open(containerfile.name, 'w') as c:
             c.write(content)
             c.flush()
+
+        # ensure base image is available
+        run_cmd([self.conman, "pull", args.carimage])
 
         build_cmd = [
             self.conman,
