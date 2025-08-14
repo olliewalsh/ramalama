@@ -13,8 +13,8 @@ spec:
     description: VM platforms on which to run test commands
     type: array
     default:
-    - linux-c4xlarge/amd64
-    - linux-c4xlarge/arm64
+    - linux-c8xlarge/amd64
+    - linux-c8xlarge/arm64
   - name: commands
     description: Test commands to run
     type: array
@@ -65,6 +65,7 @@ spec:
     - name: envs
       value:
       - RAMALAMA_IMAGE=$(tasks.init.results.ramalama-image)
+      - RAMALAMA_STACK_IMAGE=$(tasks.init.results.stack-image)
     taskRef:
       resolver: git
       params:
