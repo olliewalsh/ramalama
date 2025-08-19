@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y bash codespell python3-argcomplete
+          sudo apt-get install -y bash codespell python3-argcomplete python3-yaml
           make install-requirements
 
       - name: Run format check
@@ -48,7 +48,7 @@ jobs:
         run: |
           df -h
           sudo apt-get update
-          sudo apt-get install -y bash codespell python3-argcomplete pipx podman
+          sudo apt-get install -y bash codespell python3-argcomplete python3-yaml pipx podman
           make install-requirements
 
       - name: Upgrade to podman 5
@@ -88,7 +88,7 @@ jobs:
         run: |
           df -h
           sudo apt-get update
-          sudo apt-get install -y bash codespell python3-argcomplete pipx podman
+          sudo apt-get install -y bash codespell python3-argcomplete python3-yaml pipx podman
           make install-requirements
 
       - name: Upgrade to podman 5
@@ -127,7 +127,7 @@ jobs:
            sudo chown runner:runner /mnt/runner /home/runner/.local
            sudo mount --bind /mnt/runner /home/runner/.local
            sudo apt-get update
-           sudo apt-get install podman bats bash codespell python3-argcomplete
+           sudo apt-get install podman bats bash codespell python3-argcomplete python3-yaml
            make install-requirements
 
       - name: install ollama
@@ -167,7 +167,7 @@ jobs:
         run: |
            df -h
            sudo apt-get update
-           sudo apt-get install podman bats bash codespell python3-argcomplete git cmake libcurl4-openssl-dev
+           sudo apt-get install podman bats bash codespell python3-argcomplete python3-yaml git cmake libcurl4-openssl-dev
            make install-requirements
            sudo ./container-images/scripts/build_llama_and_whisper.sh
            sudo python -m pip install . --prefix=/usr
@@ -206,7 +206,7 @@ jobs:
         shell: bash
         run: |
            sudo apt-get update
-           sudo apt-get install bats bash codespell python3-argcomplete
+           sudo apt-get install bats bash codespell python3-argcomplete python3-yaml
            make install-requirements
 
       - name: install ollama
