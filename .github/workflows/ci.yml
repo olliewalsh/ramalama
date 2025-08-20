@@ -120,6 +120,7 @@ jobs:
       - name: install bats
         shell: bash
         run: |
+           export MYPIP="uv pip"
            df -h
            # /mnt has ~ 65 GB free disk space. / is too small.
            sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
@@ -132,7 +133,9 @@ jobs:
 
       - name: install ollama
         shell: bash
-        run: ./.github/scripts/install-ollama.sh
+        run: |
+          export MYPIP="uv pip"
+          ./.github/scripts/install-ollama.sh
 
       - name: Upgrade to podman 5
         run: |
@@ -147,8 +150,8 @@ jobs:
 
       - name: run bats
         run: |
-           TEMPDIR=/mnt/tmp
-           make install-requirements
+           export TEMPDIR=/mnt/tmp
+           export MYPIP="uv pip"
            make validate
            make bats
 
@@ -166,6 +169,7 @@ jobs:
       - name: install bats
         shell: bash
         run: |
+           export MYPIP="uv pip"
            df -h
            sudo apt-get update
            sudo apt-get install podman bats bash codespell python3-argcomplete python3-yaml git cmake libcurl4-openssl-dev
@@ -175,7 +179,9 @@ jobs:
 
       - name: install ollama
         shell: bash
-        run: ./.github/scripts/install-ollama.sh
+        run: |
+          export MYPIP="uv pip"
+          ./.github/scripts/install-ollama.sh
 
       - name: Upgrade to podman 5
         run: |
@@ -190,6 +196,7 @@ jobs:
 
       - name: bats-nocontainer
         run: |
+           MYPIP="uv pip"
            make bats-nocontainer
 
   docker:
