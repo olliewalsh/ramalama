@@ -12,18 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       
-      - name: Install the latest version of uv and activate the environment
-        uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
-          
-      - name: Install dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bash codespell python3-argcomplete python3-yaml
-          make install-requirements
-
       - name: Run format check
         run: |
           make check-format
@@ -42,14 +30,14 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           activate-environment: true
-
+ 
       - name: Install dependencies
         shell: bash
         run: |
           df -h
           sudo apt-get update
-          sudo apt-get install -y bash codespell python3-argcomplete python3-yaml pipx podman
-          make install-requirements
+          sudo apt-get install -y bash codespell pipx podman
+          make MYPIP="uv pip" install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -88,8 +76,8 @@ jobs:
         run: |
           df -h
           sudo apt-get update
-          sudo apt-get install -y bash codespell python3-argcomplete python3-yaml pipx podman
-          make install-requirements
+          sudo apt-get install -y bash codespell pipx podman
+          make MYPIP="uv pip" install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -120,7 +108,6 @@ jobs:
       - name: install bats
         shell: bash
         run: |
-           export MYPIP="uv pip"
            df -h
            # /mnt has ~ 65 GB free disk space. / is too small.
            sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
@@ -128,8 +115,8 @@ jobs:
            sudo chown runner:runner /mnt/runner /home/runner/.local
            sudo mount --bind /mnt/runner /home/runner/.local
            sudo apt-get update
-           sudo apt-get install podman bats bash codespell python3-argcomplete python3-yaml
-           make install-requirements
+           sudo apt-get install podman bats bash codespell
+           make MYPIP="uv pip" install-requirements
 
       - name: install ollama
         shell: bash
@@ -151,7 +138,6 @@ jobs:
       - name: run bats
         run: |
            export TEMPDIR=/mnt/tmp
-           export MYPIP="uv pip"
            make man-check
            make bats
 
@@ -169,18 +155,16 @@ jobs:
       - name: install bats
         shell: bash
         run: |
-           export MYPIP="uv pip"
            df -h
            sudo apt-get update
-           sudo apt-get install podman bats bash codespell python3-argcomplete python3-yaml git cmake libcurl4-openssl-dev
-           make install-requirements
+           sudo apt-get install podman bats bash codespell git cmake libcurl4-openssl-dev
+           make MYPIP="uv pip" install-requirements
            sudo ./container-images/scripts/build_llama_and_whisper.sh
-           sudo python -m pip install . --prefix=/usr
+           sudo uv pip install . --prefix=/usr
 
       - name: install ollama
         shell: bash
         run: |
-          export MYPIP="uv pip"
           ./.github/scripts/install-ollama.sh
 
       - name: Upgrade to podman 5
@@ -194,9 +178,8 @@ jobs:
            # Install specific podman version
            sudo apt-get upgrade
 
-      - name: bats-nocontainer
+      - name: run bats-nocontainer
         run: |
-           export MYPIP="uv pip"
            make bats-nocontainer
 
   docker:
@@ -214,8 +197,8 @@ jobs:
         shell: bash
         run: |
            sudo apt-get update
-           sudo apt-get install bats bash codespell python3-argcomplete python3-yaml
-           make install-requirements
+           sudo apt-get install bats bash codespell
+           make MYPIP="uv pip" install-requirements
 
       - name: install ollama
         shell: bash
@@ -255,7 +238,7 @@ jobs:
            sudo mount --bind /mnt/runner /home/runner/.local
            df -h
 
-      - name: bats-docker
+      - name: run bats-docker
         run: |
            docker info
            make bats-docker
@@ -280,17 +263,15 @@ jobs:
         shell: bash
         run: |
            brew install go bats bash jq llama.cpp shellcheck
-           make install-requirements
+           make MYPIP="uv pip" install-requirements
 
       - name: install ollama
         shell: bash
         run: ./.github/scripts/install-ollama.sh
 
-      - name: Run a one-line script
+      - name: run bats
         shell: bash
         run: |
-           make install-requirements
-           make validate
            make bats-nocontainer
 
 # FIXME: ci script should be able to run on MAC.
