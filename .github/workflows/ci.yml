@@ -20,19 +20,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bash codespell podman
-          uv run make install-requirements
+          uv run -- make install-requirements
 
       - name: Run format check
         run: |
-          uv run make check-format
+          uv run -- make check-format
 
       - name: Run lint
         run: |
-          uv run make lint
+          uv run -- make lint
 
       - name: Run man check
         run: |
-          uv run make man-check
+          uv run -- make man-check
 
   build-image:
     runs-on: ubuntu-24.04
@@ -49,7 +49,7 @@ jobs:
           df -h
           sudo apt-get update
           sudo apt-get install -y bash codespell pipx podman
-          uv run make install-requirements
+          uv run -- make install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -87,7 +87,7 @@ jobs:
           df -h
           sudo apt-get update
           sudo apt-get install -y bash codespell pipx podman
-          uv run make install-requirements
+          uv run -- make install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          uv run make unit-tests
+          uv run -- make unit-tests
 
   bats:
     runs-on: ubuntu-24.04
@@ -124,7 +124,7 @@ jobs:
            sudo mount --bind /mnt/runner /home/runner/.local
            sudo apt-get update
            sudo apt-get install podman bats bash codespell
-           uv run make install-requirements
+           uv run -- make install-requirements
 
       - name: install ollama
         shell: bash
@@ -144,7 +144,7 @@ jobs:
       - name: run bats
         run: |
            TEMPDIR=/mnt/tmp
-           uv run make bats
+           uv run -- make bats
 
   bats-nocontainer:
     runs-on: ubuntu-24.04
@@ -162,7 +162,7 @@ jobs:
            sudo apt-get update
            sudo apt-get install podman bats bash codespell git cmake libcurl4-openssl-dev
            sudo ./container-images/scripts/build_llama_and_whisper.sh
-           uv run make install-requirements
+           uv run -- make install-requirements
 
       - name: install ollama
         shell: bash
@@ -181,7 +181,7 @@ jobs:
 
       - name: run bats-nocontainer
         run: |
-           uv run make bats-nocontainer
+           uv run -- make bats-nocontainer
 
   docker:
     runs-on: ubuntu-24.04
@@ -197,7 +197,7 @@ jobs:
         run: |
            sudo apt-get update
            sudo apt-get install bats bash codespell
-           uv run make install-requirements
+           uv run -- make install-requirements
 
       - name: install ollama
         shell: bash
@@ -240,7 +240,7 @@ jobs:
       - name: run bats-docker
         run: |
            docker info
-           uv run make bats-docker
+           uv run -- make bats-docker
 
   macos:
     runs-on: macos-14
@@ -254,13 +254,13 @@ jobs:
       - name: install mlx-lm
         shell: bash
         run: |
-          uv run pip install mlx-lm
+          uv run -- pip install mlx-lm
 
       - name: install golang
         shell: bash
         run: |
            brew install go bats bash jq llama.cpp shellcheck
-           uv run make install-requirements
+           uv run -- make install-requirements
 
       - name: install ollama
         shell: bash
@@ -269,7 +269,7 @@ jobs:
       - name: run bats
         shell: bash
         run: |
-           uv run make bats-nocontainer
+           uv run -- make bats-nocontainer
 
 # FIXME: ci script should be able to run on MAC.
 #      - name: Run ci
