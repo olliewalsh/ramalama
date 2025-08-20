@@ -12,25 +12,27 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install the latest version of uv and activate the environment
-        uses: astral-sh/setup-uv@v6 
-        with:
-          activate-environment: true
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Install dependencies
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y bash codespell
-          make install-requirements
-      
+          sudo apt-get install -y bash codespell podman
+          uv run make install-requirements
+
       - name: Run format check
         run: |
-          make check-format
+          uv run make check-format
 
       - name: Run lint
         run: |
-          make lint
+          uv run make lint
+
+      - name: Run man check
+        run: |
+          uv run make man-check
 
   build-image:
     runs-on: ubuntu-24.04
@@ -38,18 +40,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install the latest version of uv and activate the environment
+      - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
- 
+
       - name: Install dependencies
         shell: bash
         run: |
           df -h
           sudo apt-get update
           sudo apt-get install -y bash codespell pipx podman
-          make install-requirements
+          uv run make install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -78,18 +78,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - name: Install the latest version of uv and activate the environment
+      - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
-          
+
       - name: Install dependencies
         shell: bash
         run: |
           df -h
           sudo apt-get update
           sudo apt-get install -y bash codespell pipx podman
-          make install-requirements
+          uv run make install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -104,19 +102,17 @@ jobs:
 
       - name: Run unit tests
         run: |
-          make unit-tests
+          uv run make unit-tests
 
   bats:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      
-      - name: Install the latest version of uv and activate the environment
+
+      - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
-          
+
       - name: install bats
         shell: bash
         run: |
@@ -128,12 +124,11 @@ jobs:
            sudo mount --bind /mnt/runner /home/runner/.local
            sudo apt-get update
            sudo apt-get install podman bats bash codespell
-           make install-requirements
+           uv run make install-requirements
 
       - name: install ollama
         shell: bash
-        run: |
-          ./.github/scripts/install-ollama.sh
+        run: ./.github/scripts/install-ollama.sh
 
       - name: Upgrade to podman 5
         run: |
@@ -149,20 +144,17 @@ jobs:
       - name: run bats
         run: |
            TEMPDIR=/mnt/tmp
-           make man-check
-           make bats
+           uv run make bats
 
   bats-nocontainer:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      
-      - name: Install the latest version of uv and activate the environment
+
+      - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
-          
+
       - name: install bats
         shell: bash
         run: |
@@ -170,12 +162,11 @@ jobs:
            sudo apt-get update
            sudo apt-get install podman bats bash codespell git cmake libcurl4-openssl-dev
            sudo ./container-images/scripts/build_llama_and_whisper.sh
-           make install-requirements
+           uv run make install-requirements
 
       - name: install ollama
         shell: bash
-        run: |
-          ./.github/scripts/install-ollama.sh
+        run: ./.github/scripts/install-ollama.sh
 
       - name: Upgrade to podman 5
         run: |
@@ -190,25 +181,23 @@ jobs:
 
       - name: run bats-nocontainer
         run: |
-           make bats-nocontainer
+           uv run make bats-nocontainer
 
   docker:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      
-      - name: Install the latest version of uv and activate the environment
+
+      - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
-          
+
       - name: install bats
         shell: bash
         run: |
            sudo apt-get update
            sudo apt-get install bats bash codespell
-           make install-requirements
+           uv run make install-requirements
 
       - name: install ollama
         shell: bash
@@ -251,29 +240,27 @@ jobs:
       - name: run bats-docker
         run: |
            docker info
-           make bats-docker
+           uv run make bats-docker
 
   macos:
     runs-on: macos-14
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      
-      - name: Install the latest version of uv and activate the environment
+
+      - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
-        with:
-          activate-environment: true
 
       - name: install mlx-lm
         shell: bash
         run: |
           uv pip install mlx-lm
-          
+
       - name: install golang
         shell: bash
         run: |
            brew install go bats bash jq llama.cpp shellcheck
-           make install-requirements
+           uv run make install-requirements
 
       - name: install ollama
         shell: bash
@@ -282,7 +269,7 @@ jobs:
       - name: run bats
         shell: bash
         run: |
-           make bats-nocontainer
+           uv run make bats-nocontainer
 
 # FIXME: ci script should be able to run on MAC.
 #      - name: Run ci
