@@ -254,7 +254,7 @@ jobs:
       - name: install mlx-lm
         shell: bash
         run: |
-          uv pip install mlx-lm
+          uv run pip install mlx-lm
 
       - name: install golang
         shell: bash
