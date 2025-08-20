@@ -152,7 +152,7 @@ jobs:
         run: |
            export TEMPDIR=/mnt/tmp
            export MYPIP="uv pip"
-           make validate
+           make man-check
            make bats
 
   bats-nocontainer:
@@ -196,7 +196,7 @@ jobs:
 
       - name: bats-nocontainer
         run: |
-           MYPIP="uv pip"
+           export MYPIP="uv pip"
            make bats-nocontainer
 
   docker:
