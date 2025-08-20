@@ -128,7 +128,6 @@ jobs:
       - name: install ollama
         shell: bash
         run: |
-          export MYPIP="uv pip"
           ./.github/scripts/install-ollama.sh
 
       - name: Upgrade to podman 5
@@ -144,7 +143,7 @@ jobs:
 
       - name: run bats
         run: |
-           export TEMPDIR=/mnt/tmp
+           TEMPDIR=/mnt/tmp
            make man-check
            make bats
 
@@ -165,9 +164,8 @@ jobs:
            df -h
            sudo apt-get update
            sudo apt-get install podman bats bash codespell git cmake libcurl4-openssl-dev
-           make MYPIP="uv pip" install-requirements
            sudo ./container-images/scripts/build_llama_and_whisper.sh
-           sudo uv pip install . --prefix=/usr
+           make MYPIP="uv pip" install-requirements
 
       - name: install ollama
         shell: bash
