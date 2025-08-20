@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install the latest version of uv and activate the environment
+        uses: astral-sh/setup-uv@v6 
+        with:
+          activate-environment: true
+
       - name: Install dependencies
         shell: bash
         run: |
@@ -44,7 +49,7 @@ jobs:
           df -h
           sudo apt-get update
           sudo apt-get install -y bash codespell pipx podman
-          make MYPIP="uv pip" install-requirements
+          make install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -84,7 +89,7 @@ jobs:
           df -h
           sudo apt-get update
           sudo apt-get install -y bash codespell pipx podman
-          make MYPIP="uv pip" install-requirements
+          make install-requirements
 
       - name: Upgrade to podman 5
         run: |
@@ -123,7 +128,7 @@ jobs:
            sudo mount --bind /mnt/runner /home/runner/.local
            sudo apt-get update
            sudo apt-get install podman bats bash codespell
-           make MYPIP="uv pip" install-requirements
+           make install-requirements
 
       - name: install ollama
         shell: bash
@@ -165,7 +170,7 @@ jobs:
            sudo apt-get update
            sudo apt-get install podman bats bash codespell git cmake libcurl4-openssl-dev
            sudo ./container-images/scripts/build_llama_and_whisper.sh
-           make MYPIP="uv pip" install-requirements
+           make install-requirements
 
       - name: install ollama
         shell: bash
@@ -203,7 +208,7 @@ jobs:
         run: |
            sudo apt-get update
            sudo apt-get install bats bash codespell
-           make MYPIP="uv pip" install-requirements
+           make install-requirements
 
       - name: install ollama
         shell: bash
@@ -268,7 +273,7 @@ jobs:
         shell: bash
         run: |
            brew install go bats bash jq llama.cpp shellcheck
-           make MYPIP="uv pip" install-requirements
+           make install-requirements
 
       - name: install ollama
         shell: bash

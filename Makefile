@@ -50,9 +50,12 @@ install-detailed-cov-requirements:
 install-cov-requirements:
 	${MYPIP} install ".[cov]"
 
+.PHONY: install-uv
+install-uv:
+	./install-uv.sh
+
 .PHONY: install-requirements
 install-requirements:
-	./install-uv.sh
 	${MYPIP} install ".[dev]"
 
 .PHONY: install-completions
