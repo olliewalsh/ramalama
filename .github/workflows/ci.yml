@@ -148,6 +148,7 @@ jobs:
       - name: run bats
         run: |
            TEMPDIR=/mnt/tmp
+           make install-requirements
            make validate
            make bats
 
