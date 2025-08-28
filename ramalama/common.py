@@ -17,6 +17,8 @@ from collections.abc import Callable, Iterable
 from functools import lru_cache
 from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, TypedDict, cast, get_args
 
+import yaml
+
 import ramalama.amdkfd as amdkfd
 from ramalama.logger import logger
 from ramalama.version import version
@@ -248,11 +250,14 @@ def load_cdi_yaml(stream: Iterable[str]) -> CDI_RETURN_TYPE:
     # same line following a colon.
 
     data: CDI_RETURN_TYPE = {"devices": []}
-    for line in stream:
-        if ':' in line:
-            key, value = line.split(':', 1)
-            if key.strip() == "- name":
-                data['devices'].append({'name': value.strip().strip('"')})
+    parsed = yaml.safe_load(stream) or {}
+    devices = parsed.get("devices") or []
+    for device in devices:
+        if not isinstance(device, dict):
+            continue
+        for key, value in device.items():
+            if key == "name":
+                data['devices'].append({'name': value})
     return data
 
 
@@ -569,13 +574,13 @@ def select_cuda_image(config: Config) -> str:
         str: The appropriate CUDA image name
 
     Raises:
-        RuntimeError: If CUDA version is less than 12.4
+        NotImplementedError: If CUDA version is less than 12.4
     """
     # Get the default CUDA image from config
     cuda_image = config.images.get("CUDA_VISIBLE_DEVICES")
 
     if cuda_image is None:
-        raise RuntimeError("No image repository found for CUDA_VISIBLE_DEVICES in config.")
+        raise NotImplementedError("No image repository found for CUDA_VISIBLE_DEVICES in config.")
 
     # Check CUDA version and select appropriate image
     cuda_version = check_cuda_version()
@@ -586,7 +591,7 @@ def select_cuda_image(config: Config) -> str:
     elif cuda_version >= (12, 4):
         return f"{cuda_image}-12.4.1"  # Use the specific version for older CUDA
     else:
-        raise RuntimeError(f"CUDA version {cuda_version} is not supported. Minimum required version is 12.4.")
+        raise NotImplementedError(f"CUDA version {cuda_version} is not supported. Minimum required version is 12.4.")
 
 
 class AccelImageArgsWithImage(Protocol):
@@ -623,6 +628,9 @@ def accel_image(config: Config) -> str:
     if config.is_set("image"):
         return tagged_image(config.image)
 
+    if config.runtime == "vllm":
+        return config.images["VLLM"]
+
     set_gpu_type_env_vars()
     gpu_type = next(iter(get_gpu_type_env_vars()), None)
 
@@ -632,10 +640,11 @@ def accel_image(config: Config) -> str:
     # Special handling for CUDA images based on version - only if the image is the default CUDA image
     cuda_image = config.images.get("CUDA_VISIBLE_DEVICES")
     if image == cuda_image:
-        image = select_cuda_image(config)
-
-    if config.runtime == "vllm":
-        return "registry.redhat.io/rhelai1/ramalama-vllm"
+        try:
+            image = select_cuda_image(config)
+        except NotImplementedError as e:
+            logger.warn(f"{e}: Falling back to default image.")
+            image = config.default_image
 
     vers = minor_release()
 

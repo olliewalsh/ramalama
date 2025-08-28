@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ramalama"
-version = "0.12.0"
+version = "0.12.1"
 description = "RamaLama is a command line tool for working with AI LLM models."
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["ramalama", "llama", "AI"]
 dependencies = [
   "argcomplete",
+  "pyyaml",
 ]
 maintainers = [
    { name="Dan Walsh", email = "dwalsh@redhat.com" },
@@ -33,10 +34,12 @@ dev = [
     "pytest~=8.3",
     "wheel~=0.45.0",
     "mypy",
+    "pyyaml",
 ]
 
 cov = [
     "pytest-cov",
+    "pyyaml",
 ]
 
 cov-detailed = [
@@ -44,7 +47,8 @@ cov-detailed = [
     "pytest-func-cov",
     "pytest-report",
     "pytest-json",
-    "pytest-html"
+    "pytest-html",
+    "pyyaml",
 ]
 
 [project.urls]
