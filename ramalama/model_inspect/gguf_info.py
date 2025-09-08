@@ -1,8 +1,26 @@
 import json
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 from ramalama.endian import GGUFEndian
 from ramalama.model_inspect.base_info import ModelInfoBase, Tensor, adjust_new_line
+
+
+class GGUFModelMetadata:
+
+    def __init__(self, data: Dict[str, Any]):
+        self.data = data
+
+    def get(self, key: str) -> Any:
+        return self.data.get(key)
+
+    def serialize(self, json: bool = False) -> str:
+        if json:
+            return json.dumps(self.data, sort_keys=True, indent=4)
+
+        ret = ""
+        for key, value in sorted(self.data.items()):
+            ret = ret + adjust_new_line(f"{key}: {value}")
+        return ret
 
 
 class GGUFModelInfo(ModelInfoBase):
@@ -23,12 +41,19 @@ class GGUFModelInfo(ModelInfoBase):
 
         self.Format = GGUFModelInfo.MAGIC_NUMBER
         self.Version = Version
-        self.Metadata: Dict[str, Any] = metadata
+        self.Metadata: GGUFModelMetadata = GGUFModelMetadata(metadata)
         self.Tensors: list[Tensor] = tensors
         self.Endianness: GGUFEndian = endianness
 
-    def get_chat_template(self) -> str:
-        return self.Metadata.get("chat_template", "")
+    def get_chat_template(self) -> Optional[str]:
+        return next(
+            (
+                self.Metadata.get(template)
+                for template in ["chat_template", "tokenizer.chat_template"]
+                if template in self.Metadata.data
+            ),
+            None,
+        )
 
     def serialize(self, json: bool = False, all: bool = False) -> str:
         if json:
@@ -40,10 +65,10 @@ class GGUFModelInfo(ModelInfoBase):
         ret = ret + adjust_new_line(f"   Endianness: {'little' if self.Endianness == GGUFEndian.LITTLE else 'big'}")
         metadata_header = "   Metadata: "
         if not all:
-            metadata_header = metadata_header + f"{len(self.Metadata)} entries"
+            metadata_header = metadata_header + f"{len(self.Metadata.data)} entries"
         ret = ret + adjust_new_line(metadata_header)
         if all:
-            for key, value in sorted(self.Metadata.items()):
+            for key, value in sorted(self.Metadata.data.items()):
                 ret = ret + adjust_new_line(f"      {key}: {value}")
         tensor_header = "   Tensors: "
         if not all:
@@ -64,6 +89,6 @@ class GGUFModelInfo(ModelInfoBase):
             return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
         d = {k: v for k, v in self.__dict__.items() if k != "Metadata" and k != "Tensors"}
-        d["Metadata"] = len(self.Metadata)
+        d["Metadata"] = len(self.Metadata.data)
         d["Tensors"] = len(self.Tensors)
         return json.dumps(d, sort_keys=True, indent=4)

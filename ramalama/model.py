@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import ramalama.chat as chat
 from ramalama.common import (
@@ -388,7 +388,7 @@ class Model(ModelBase):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
 
-        args.port = compute_serving_port(args, quiet=args.debug)
+        args.port = compute_serving_port(args, quiet=not args.debug)
         if args.container:
             args.name = self.get_container_name(args)
 
@@ -652,7 +652,7 @@ class Model(ModelBase):
                 exec_args += ["--chat-template-file", chat_template_path]
 
         if should_colorize():
-            exec_args += ["--log-colors"]
+            exec_args += ["--log-colors", "on"]
 
         exec_args += [
             "--alias",
@@ -681,7 +681,7 @@ class Model(ModelBase):
             exec_args.extend(["--no-webui"])
 
         if check_nvidia() or check_metal(args):
-            exec_args.extend(["--flash-attn"])
+            exec_args.extend(["--flash-attn", "on"])
         return exec_args
 
     def mlx_serve(self, args):
@@ -788,7 +788,7 @@ class Model(ModelBase):
             if args.dryrun:
                 dry_run(exec_args)
                 return
-            exec_cmd(exec_args, stdout2null=args.noout)
+            exec_cmd(exec_args, stdout2null=args.noout, stderr2null=args.noout)
         except FileNotFoundError as e:
             if args.container:
                 raise NotImplementedError(
@@ -838,23 +838,47 @@ class Model(ModelBase):
         compose = Compose(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
         compose.generate().write(output_dir)
 
-    def inspect(self, args) -> None:
-        self.ensure_model_exists(args)
+    def inspect_metadata(self) -> Dict[str, Any]:
+        model_path = self._get_entry_model_path(False, False, False)
+        if GGUFInfoParser.is_model_gguf(model_path):
+            return GGUFInfoParser.parse_metadata(model_path).data
+        return {}
 
+    def inspect(
+        self,
+        show_all: bool = False,
+        show_all_metadata: bool = False,
+        get_field: str = "",
+        as_json: bool = False,
+        dryrun: bool = False,
+    ) -> None:
         model_name = self.filename
         model_registry = self.type.lower()
-        model_path = self._get_entry_model_path(False, False, args.dryrun)
+        model_path = self._get_entry_model_path(False, False, dryrun)
 
         if GGUFInfoParser.is_model_gguf(model_path):
-            gguf_info: GGUFModelInfo = GGUFInfoParser.parse(model_name, model_registry, model_path)
-            print(gguf_info.serialize(json=args.json, all=args.all))
-            return
+            if not show_all_metadata and get_field == "":
+                gguf_info: GGUFModelInfo = GGUFInfoParser.parse(model_name, model_registry, model_path)
+                print(gguf_info.serialize(json=as_json, all=show_all))
+                return
+
+            metadata = GGUFInfoParser.parse_metadata(model_path)
+            if show_all_metadata:
+                print(metadata.serialize(json=as_json))
+                return
+            elif get_field != "":  # If a specific field is requested, print only that field
+                field_value = metadata.get(get_field)
+                if field_value is None:
+                    raise KeyError(f"Field '{get_field}' not found in GGUF model metadata")
+                print(field_value)
+                return
+
         if SafetensorInfoParser.is_model_safetensor(model_name):
             safetensor_info: SafetensorModelInfo = SafetensorInfoParser.parse(model_name, model_registry, model_path)
-            print(safetensor_info.serialize(json=args.json, all=args.all))
+            print(safetensor_info.serialize(json=as_json, all=show_all))
             return
 
-        print(ModelInfoBase(model_name, model_registry, model_path).serialize(json=args.json))
+        print(ModelInfoBase(model_name, model_registry, model_path).serialize(json=as_json))
 
     def print_pull_message(self, model_name):
         model_name = trim_model_name(model_name)
