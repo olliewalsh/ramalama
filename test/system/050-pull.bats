@@ -12,8 +12,8 @@ load setup_suite
 
 # bats test_tags=distro-integration
 @test "ramalama pull ollama" {
-    run_ramalama pull tiny
-    run_ramalama rm tiny
+    run_ramalama pull ollama://tinyllama
+    run_ramalama rm ollama://tinyllama
     run_ramalama pull https://ollama.com/library/smollm:135m
     run_ramalama list
     is "$output" ".*https://ollama.com/library/smollm:135m" "image was actually pulled locally"
@@ -36,8 +36,8 @@ load setup_suite
     ollama serve &
     sleep 3
     ollama pull tinyllama
-    run_ramalama pull tiny
-    run_ramalama rm tiny
+    run_ramalama pull ollama://tinyllama
+    run_ramalama rm ollama://tinyllama
     ollama rm tinyllama
 
     ollama pull smollm:135m
@@ -165,6 +165,24 @@ load setup_suite
     run_ramalama list
     is "$output" ".*quay.io/mmortari/gguf-py-example" "OCI image was actually pulled locally"
     run_ramalama rm oci://quay.io/mmortari/gguf-py-example:v1
+}
+
+@test "ramalama pull little-endian" {
+    if ! is_bigendian; then
+        skip "Testing pulls of opposite-endian models"
+    fi
+    run_ramalama rm --ignore tiny
+    run_ramalama 1 pull --verify=on tiny
+    is "$output" ".*Endian mismatch of host (BIG) and model (LITTLE).*" "detected little-endian model"
+}
+
+@test "ramalama pull big-endian" {
+    if is_bigendian; then
+        skip "Testing pulls of opposite-endian models"
+    fi
+    run_ramalama rm --ignore stories-be:260k
+    run_ramalama 1 pull --verify=on stories-be:260k
+    is "$output" ".*Endian mismatch of host (LITTLE) and model (BIG).*" "detected big-endian model"
 }
 
 @test "ramalama URL" {
