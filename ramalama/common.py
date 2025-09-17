@@ -13,7 +13,7 @@ import shutil
 import string
 import subprocess
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from functools import lru_cache
 from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, TypedDict, cast, get_args
 
@@ -93,14 +93,14 @@ def handle_provider(machine, config: Config | None = None) -> bool | None:
 def apple_vm(engine: SUPPORTED_ENGINES, config: Config | None = None) -> bool:
     podman_machine_list = [engine, "machine", "list", "--format", "json", "--all-providers"]
     try:
-        machines_json = run_cmd(podman_machine_list, ignore_stderr=True).stdout.decode("utf-8").strip()
+        machines_json = run_cmd(podman_machine_list, ignore_stderr=True, encoding="utf-8").stdout.strip()
         machines = json.loads(machines_json)
         for machine in machines:
             result = handle_provider(machine, config)
             if result is not None:
                 return result
-    except subprocess.CalledProcessError:
-        pass
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        logger.warning(f"Failed to list and parse podman machines: {e}")
     return False
 
 
@@ -232,7 +232,7 @@ def genname():
 def engine_version(engine: SUPPORTED_ENGINES) -> str:
     # Create manifest list for target with imageid
     cmd_args = [str(engine), "version", "--format", "{{ .Client.Version }}"]
-    return run_cmd(cmd_args).stdout.decode("utf-8").strip()
+    return run_cmd(cmd_args, encoding="utf-8").stdout.strip()
 
 
 class CDI_DEVICE(TypedDict):
@@ -241,26 +241,6 @@ class CDI_DEVICE(TypedDict):
 
 class CDI_RETURN_TYPE(TypedDict):
     devices: list[CDI_DEVICE]
-
-
-def load_cdi_yaml(stream: Iterable[str]) -> CDI_RETURN_TYPE:
-    # Returns a dict containing just the "devices" key, whose value is
-    # a list of dicts, each mapping the key "name" to a device name.
-    # For example: {'devices': [{'name': 'all'}]}
-    # This depends on the key "name" being unique to the list of dicts
-    # under "devices" and the value of the "name" key being on the
-    # same line following a colon.
-
-    data: CDI_RETURN_TYPE = {"devices": []}
-    parsed = yaml.safe_load(stream) or {}
-    devices = parsed.get("devices") or []
-    for device in devices:
-        if not isinstance(device, dict):
-            continue
-        for key, value in device.items():
-            if key == "name":
-                data['devices'].append({'name': value})
-    return data
 
 
 def load_cdi_config(spec_dirs: list[str]) -> CDI_RETURN_TYPE | None:
@@ -275,18 +255,16 @@ def load_cdi_config(spec_dirs: list[str]) -> CDI_RETURN_TYPE | None:
                 if ext in [".yaml", ".yml"]:
                     try:
                         with open(file_path, "r") as stream:
-                            return load_cdi_yaml(stream)
-                    except OSError:
+                            return yaml.safe_load(stream)
+                    except (OSError, yaml.YAMLError) as e:
+                        logger.warning(f"Failed to load YAML file {file_path}: {e}")
                         continue
                 elif ext == ".json":
                     try:
                         with open(file_path, "r") as stream:
                             return json.load(stream)
-                    except json.JSONDecodeError:
-                        continue
-                    except UnicodeDecodeError:
-                        continue
-                    except OSError:
+                    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+                        logger.warning(f"Failed to load JSON file {file_path}: {e}")
                         continue
     return None
 
@@ -295,9 +273,14 @@ def find_in_cdi(devices: list[str]) -> tuple[list[str], list[str]]:
     # Attempts to find a CDI configuration for each device in devices
     # and returns a list of configured devices and a list of
     # unconfigured devices.
-    cdi = load_cdi_config(['/etc/cdi', '/var/run/cdi'])
-    cdi_devices = cdi.get("devices", []) if cdi else []
-    cdi_device_names = [name for cdi_device in cdi_devices if (name := cdi_device.get("name"))]
+    cdi = load_cdi_config(['/var/run/cdi', '/etc/cdi'])
+    try:
+        cdi_devices = cdi.get("devices", []) if cdi else []
+        cdi_device_names = [name for cdi_device in cdi_devices if (name := cdi_device.get("name"))]
+    except (AttributeError, KeyError, TypeError) as e:
+        # Malformed YAML or JSON. Treat everything as unconfigured but warn.
+        logger.warning(f"Unable to process CDI configuration: {e}")
+        return ([], devices)
 
     configured = []
     unconfigured = []
@@ -381,7 +364,7 @@ def check_nvidia() -> Literal["cuda"] | None:
 def check_ascend() -> Literal["cann"] | None:
     try:
         command = ['npu-smi', 'info']
-        run_cmd(command).stdout.decode("utf-8")
+        run_cmd(command, encoding="utf-8")
         os.environ["ASCEND_VISIBLE_DEVICES"] = "0"
         return "cann"
     except Exception:
@@ -451,7 +434,7 @@ def check_intel() -> Literal["intel"] | None:
 def check_mthreads() -> Literal["musa"] | None:
     try:
         command = ['mthreads-gmi']
-        run_cmd(command).stdout.decode("utf-8")
+        run_cmd(command, encoding="utf-8")
         os.environ["MUSA_VISIBLE_DEVICES"] = "0"
         return "musa"
     except Exception:
@@ -551,7 +534,7 @@ def check_cuda_version() -> tuple[int, int]:
     try:
         # Run nvidia-smi --version to get version info
         command = ['nvidia-smi']
-        output = run_cmd(command).stdout.decode("utf-8").strip()
+        output = run_cmd(command, encoding="utf-8").stdout.strip()
 
         # Look for CUDA Version in the output
         cuda_match = re.search(r'CUDA Version\s*:\s*(\d+)\.(\d+)', output)
