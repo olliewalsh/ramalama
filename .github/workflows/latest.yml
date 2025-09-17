@@ -31,7 +31,7 @@ jobs:
            sudo apt-get update
            sudo apt-get purge firefox
            # Install specific podman version
-           sudo apt-get upgrade
+           sudo apt-get upgrade podman
 
       # /mnt has ~ 65 GB free disk space. / is too small.
       - name: Reconfigure Docker data-root
@@ -94,7 +94,7 @@ jobs:
              sudo apt-get update
              sudo apt-get purge firefox
              # Install specific podman version
-             sudo apt-get upgrade
+             sudo apt-get upgrade podman
 
         - name: Free Disk Space Linux
           shell: bash
