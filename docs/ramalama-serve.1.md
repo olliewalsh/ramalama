@@ -19,6 +19,7 @@ registry if it does not exist in local storage.
 | ModelScope    | modelscope://, ms:// | [`modelscope.cn`](https://modelscope.cn/)|
 | Ollama        | ollama:// | [`ollama.com`](https://www.ollama.com)|
 | OCI Container Registries | oci:// | [`opencontainers.org`](https://opencontainers.org)|
+| rlcr          | rlcr://   | [`ramalama.com`](https://registry.ramalama.com/projects/ramalama) |
 |||Examples: [`quay.io`](https://quay.io),  [`Docker Hub`](https://docker.io),[`Artifactory`](https://artifactory.com)|
 
 RamaLama defaults to the Ollama registry transport. This default can be overridden in the `ramalama.conf` file or via the RAMALAMA_TRANSPORTS
@@ -102,6 +103,7 @@ Generate specified configuration format for running the AI Model as a service
 | quadlet      | Podman supported container definition for running AI Model under systemd |
 | kube         | Kubernetes YAML definition for running the AI Model as a service         |
 | quadlet/kube | Kubernetes YAML definition for running the AI Model as a service and Podman supported container definition for running the Kube YAML specified pod under systemd|
+| compose      | Compose YAML definition for running the AI Model as a service            |
 
 Optionally, an output directory for the generated files can be specified by
 appending the path to the type, e.g. `--generate kube:/etc/containers/systemd`.
@@ -118,7 +120,7 @@ OCI container image to run with specified AI model. RamaLama defaults to using
 images based on the accelerator it discovers. For example:
 `quay.io/ramalama/ramalama`. See the table above for all default images.
 The default image tag is based on the minor version of the RamaLama package.
-Version 0.12.2 of RamaLama pulls an image with a `:0.12` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
+Version 0.12.3 of RamaLama pulls an image with a `:0.12` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
 
 The default can be overridden in the ramalama.conf file or via the
 RAMALAMA_IMAGE environment variable. `export RAMALAMA_IMAGE=quay.io/ramalama/aiimage:1.2` tells
@@ -396,6 +398,30 @@ spec:
       - hostPath:
 	  path: /dev/dri
 	name: dri
+```
+
+### Generate Compose file
+```
+$ ramalama serve --name=my-smollm-server --port 1234 --generate=compose smollm:135m
+Generating Compose YAML file: docker-compose.yaml
+$ cat docker-compose.yaml
+version: '3.8'
+services:
+  my-smollm-server:
+    image: quay.io/ramalama/ramalama:latest
+    container_name: my-smollm-server
+    command: ramalama serve --host 0.0.0.0 --port 1234 smollm:135m
+    ports:
+      - "1234:1234"
+    volumes:
+      - ~/.local/share/ramalama/models/smollm-135m-instruct:/mnt/models/model.file:ro
+    environment:
+      - HOME=/tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
+      - label=disable
 ```
 
 ### Generate a Llama Stack Kubernetes YAML file named MyLamaStack

@@ -20,6 +20,7 @@ from ramalama.common import (
     genname,
     is_split_file_model,
     perror,
+    populate_volume_from_image,
     set_accel_env_vars,
 )
 from ramalama.compose import Compose
@@ -39,7 +40,7 @@ from ramalama.quadlet import Quadlet
 from ramalama.rag import rag_image
 from ramalama.version import version
 
-MODEL_TYPES = ["file", "https", "http", "oci", "huggingface", "hf", "modelscope", "ms", "ollama"]
+MODEL_TYPES = ["file", "https", "http", "oci", "huggingface", "hf", "modelscope", "ms", "ollama", "rlcr"]
 
 
 file_not_found = """\
@@ -356,14 +357,20 @@ class Model(ModelBase):
     def setup_mounts(self, args):
         if args.dryrun:
             return
-
         if self.model_type == 'oci':
-            if not self.engine.use_podman:
-                raise NotImplementedError("Serving OCI models via image mount is only supported with Podman.")
-            self.engine.add([f"--mount=type=image,src={self.model},destination={MNT_DIR},subpath=/models,rw=false"])
+            if self.engine.use_podman:
+                mount_cmd = f"--mount=type=image,src={self.model},destination={MNT_DIR},subpath=/models,rw=false"
+            elif self.engine.use_docker:
+                output_filename = self._get_entry_model_path(args.container, True, args.dryrun)
+                volume = populate_volume_from_image(self, os.path.basename(output_filename))
+                mount_cmd = f"--mount=type=volume,src={volume},dst={MNT_DIR},readonly"
+            else:
+                raise NotImplementedError(f"No compatible oci mount method for {self.engine.args.engine}")
+            self.engine.add([mount_cmd])
             return None
 
         ref_file = self.model_store.get_ref_file(self.model_tag)
+
         if ref_file is None:
             raise NoRefFileFound(self.model)
 

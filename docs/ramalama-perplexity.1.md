@@ -14,6 +14,7 @@ ramalama\-perplexity - calculate the perplexity value of an AI Model
 | HuggingFace   | huggingface://, hf://, hf.co/ | [`huggingface.co`](https://www.huggingface.co)|
 | ModelScope    | modelscope://, ms:// | [`modelscope.cn`](https://modelscope.cn/)|
 | Ollama        | ollama:// | [`ollama.com`](https://www.ollama.com)|
+| rlcr          | rlcr://   | [`ramalama.com`](https://registry.ramalama.com/projects/ramalama) |
 | OCI Container Registries | oci:// | [`opencontainers.org`](https://opencontainers.org)|
 |||Examples: [`quay.io`](https://quay.io),  [`Docker Hub`](https://docker.io),[`Artifactory`](https://artifactory.com)|
 
@@ -61,7 +62,7 @@ OCI container image to run with specified AI model. RamaLama defaults to using
 images based on the accelerator it discovers. For example:
 `quay.io/ramalama/ramalama`. See the table below for all default images.
 The default image tag is based on the minor version of the RamaLama package.
-Version 0.12.2 of RamaLama pulls an image with a `:0.12` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
+Version 0.12.3 of RamaLama pulls an image with a `:0.12` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
 
 The default can be overridden in the ramalama.conf file or via the
 RAMALAMA_IMAGE environment variable. `export RAMALAMA_IMAGE=quay.io/ramalama/aiimage:1.2` tells

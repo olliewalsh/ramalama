@@ -3,10 +3,10 @@ import re
 import shutil
 
 from ramalama.common import SPLIT_MODEL_PATH_RE, generate_sha256, is_split_file_model
-from ramalama.huggingface import HuggingfaceRepository
-from ramalama.model import Model
 from ramalama.model_store.snapshot_file import SnapshotFile, SnapshotFileType
-from ramalama.modelscope import ModelScopeRepository
+from ramalama.transports.base import Transport
+from ramalama.transports.huggingface import HuggingfaceRepository
+from ramalama.transports.modelscope import ModelScopeRepository
 
 
 class LocalModelFile(SnapshotFile):
@@ -39,7 +39,7 @@ class LocalModelFile(SnapshotFile):
         return os.path.relpath(blob_file_path, start=snapshot_dir)
 
 
-class URL(Model):
+class URL(Transport):
     def __init__(self, model, model_store_path, scheme):
         super().__init__(model, model_store_path)
 
@@ -84,12 +84,14 @@ class URL(Model):
             return files
 
         path_part = match[1]
+        if path_part:
+            path_part += '/'
         filename_base = match[2]
         total_parts = int(match[3])
 
         for i in range(1, total_parts + 1):
             file_name = f"{filename_base}-{i:05d}-of-{total_parts:05d}.gguf"
-            url = f"{self.type}://{path_part}/{file_name}"
+            url = f"{self.type}://{path_part}{file_name}"
             files.append(
                 SnapshotFile(
                     url=url,
