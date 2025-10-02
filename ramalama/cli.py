@@ -24,6 +24,7 @@ except Exception:
 import ramalama.chat as chat
 from ramalama import engine
 from ramalama.chat import default_prefix
+from ramalama.command.factory import assemble_command
 from ramalama.common import accel_image, get_accel, perror
 from ramalama.config import CONFIG, coerce_to_bool, load_file_config
 from ramalama.endian import EndianMismatchError
@@ -38,6 +39,7 @@ from ramalama.transports.base import (
     NoGGUFModelFileFound,
     NoRefFileFound,
     SafetensorModelNotSupported,
+    compute_serving_port,
     trim_model_name,
 )
 from ramalama.transports.transport_factory import New, TransportFactory
@@ -427,7 +429,8 @@ def list_files_by_modification(args):
 
 def bench_cli(args):
     model = New(args.MODEL, args)
-    model.bench(args)
+    model.ensure_model_exists(args)
+    model.bench(args, assemble_command(args))
 
 
 def add_network_argument(parser, dflt="none"):
@@ -1003,8 +1006,9 @@ def chat_parser(subparsers):
     parser.add_argument(
         "--api-key",
         type=str,
-        default=os.getenv("API_KEY"),
-        help="OpenAI-compatible API key. Can also be set via the API_KEY environment variable.",
+        default=CONFIG.api_key,
+        help="""OpenAI-compatible API key.
+        Can also be set in ramalama.conf or via the RAMALAMA_API_KEY environment variable.""",
     )
     chat_run_options(parser)
     parser.add_argument(
@@ -1047,9 +1051,14 @@ def run_cli(args):
         args.generate = None
 
     try:
+        # detect available port and update arguments
+        args.port = compute_serving_port(args)
+
         model = New(args.MODEL, args)
         model.ensure_model_exists(args)
-        model.serve(args, quiet=True) if args.rag else model.run(args)
+        if args.rag:
+            return model.serve(args, assemble_command(args))
+        model.run(args, assemble_command(args))
 
     except KeyError as e:
         logger.debug(e)
@@ -1058,7 +1067,9 @@ def run_cli(args):
             oci_model = TransportFactory(args.MODEL, args, ignore_stderr=True).create_oci()
             oci_model.ensure_model_exists(args)
 
-            oci_model.serve(args, quiet=True) if args.rag else oci_model.run(args)
+            if args.rag:
+                return oci_model.serve(args, assemble_command(args))
+            oci_model.run(args, assemble_command(args))
         except Exception as exc:
             raise e from exc
 
@@ -1095,13 +1106,18 @@ def serve_cli(args):
         return stack.serve()
 
     try:
+        # detect available port and update arguments
+        args.port = compute_serving_port(args)
+
         model = New(args.MODEL, args)
-        model.serve(args)
+        model.ensure_model_exists(args)
+        model.serve(args, assemble_command(args))
     except KeyError as e:
         try:
             args.quiet = True
             model = TransportFactory(args.MODEL, args, ignore_stderr=True).create_oci()
-            model.serve(args)
+            model.ensure_model_exists(args)
+            model.serve(args, assemble_command(args))
         except Exception:
             raise e
 
@@ -1377,7 +1393,8 @@ def perplexity_parser(subparsers):
 
 def perplexity_cli(args):
     model = New(args.MODEL, args)
-    model.perplexity(args)
+    model.ensure_model_exists(args)
+    model.perplexity(args, assemble_command(args))
 
 
 def inspect_parser(subparsers):

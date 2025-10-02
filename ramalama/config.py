@@ -18,6 +18,13 @@ SUPPORTED_ENGINES: TypeAlias = Literal["podman", "docker"]
 SUPPORTED_RUNTIMES: TypeAlias = Literal["llama.cpp", "vllm", "mlx"]
 COLOR_OPTIONS: TypeAlias = Literal["auto", "always", "never"]
 
+DEFAULT_CONFIG_DIRS = [
+    f"{sys.prefix}/share/ramalama",
+    f"{sys.prefix}/local/share/ramalama",
+    "/etc/ramalama",
+    os.path.expanduser(os.path.join(os.getenv("XDG_CONFIG_HOME", "~/.config"), "ramalama")),
+]
+
 
 def get_default_engine() -> SUPPORTED_ENGINES | None:
     """Determine the container manager to use based on environment and platform."""
@@ -35,6 +42,47 @@ def get_default_store() -> str:
         return "/var/lib/ramalama"
 
     return os.path.expanduser("~/.local/share/ramalama")
+
+
+def get_inference_spec_files() -> dict[str, Path]:
+    files: dict[str, Path] = {}
+
+    # Add relative spec dir path for development
+    default_inference_spec_dirs = ["./inference-spec/engines/"]
+    default_inference_spec_dirs.extend([os.path.join(conf_dir, "inference") for conf_dir in DEFAULT_CONFIG_DIRS])
+    for spec_dir in default_inference_spec_dirs:
+        if not os.path.exists(spec_dir):
+            continue
+
+        # Give preference to .yaml, then .json spec files
+        file_extensions = ["*.yaml", "*.yml", "*.json"]
+        for file_extension in file_extensions:
+            # On naming collisions, i.e. muliple specs for one inference engine, prefer the
+            # spec files discovered later (i.e. user-level > system-level)
+            for spec_file in sorted(Path(spec_dir).glob(file_extension)):
+                file = Path(spec_file)
+                runtime = file.stem
+                files[runtime] = file
+
+    return files
+
+
+def get_inference_schema_files() -> dict[str, Path]:
+    files: dict[str, Path] = {}
+
+    # Add relative schema dir path for development
+    default_inference_schema_dirs = ["./inference-spec/schema/"]
+    default_inference_schema_dirs.extend([os.path.join(conf_dir, "inference") for conf_dir in DEFAULT_CONFIG_DIRS])
+    for schema_dir in default_inference_schema_dirs:
+        if not os.path.exists(schema_dir):
+            continue
+
+        for spec_file in sorted(Path(schema_dir).glob("schema.*.json")):
+            file = Path(spec_file)
+            version = file.name.replace("schema.", "").replace(".json", "")
+            files[version] = file
+
+    return files
 
 
 def coerce_to_bool(value: Any) -> bool:
@@ -67,6 +115,7 @@ class RamalamaSettings:
 @dataclass
 class BaseConfig:
     api: str = "none"
+    api_key: str = None
     carimage: str = "registry.access.redhat.com/ubi10-micro:latest"
     container: bool = None  # type: ignore
     ctx_size: int = 0
@@ -134,12 +183,7 @@ def load_file_config() -> dict[str, Any]:
         return config
 
     config = {}
-    default_config_paths = [
-        "/usr/share/ramalama/ramalama.conf",
-        "/usr/local/share/ramalama/ramalama.conf",
-        "/etc/ramalama/ramalama.conf",
-        os.path.expanduser(os.path.join(os.getenv("XDG_CONFIG_HOME", "~/.config"), "ramalama", "ramalama.conf")),
-    ]
+    default_config_paths = [os.path.join(conf_dir, "ramalama.conf") for conf_dir in DEFAULT_CONFIG_DIRS]
 
     config_paths = []
     for path in default_config_paths:
