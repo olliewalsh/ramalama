@@ -67,4 +67,4 @@ jobs:
 
       - name: Build Images
         run: |
-          ./container_build.sh -r -c -s build
+          CMAKE_NPROC=1 ./container_build.sh -r -c -s build
