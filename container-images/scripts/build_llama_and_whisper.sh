@@ -192,7 +192,7 @@ cmake_steps() {
     if [[ "${RAMALAMA_IMAGE_BUILD_DEBUG_MODE:-}" == y ]]; then
         build_config=Debug
     fi
-    cmake --build build --config "$build_config" -j"$(nproc)" 2>&1 | cmake_check_warnings
+    cmake --build build --config "$build_config" -j"${CMAKE_NPROC:-$(nproc)}" 2>&1 | cmake_check_warnings
     cmake --install build 2>&1 | cmake_check_warnings
   )
 }
