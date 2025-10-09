@@ -137,10 +137,10 @@ class StyleHandler:
         return identify_template_style(template)
 
     def needs_conversion(self, template_style: TemplateStyle) -> bool:
-        return isinstance(template_style, self.target_template_style)
+        return not isinstance(template_style, self.target_template_style)
 
     def convert_template(self, template_style: TemplateStyle) -> str:
-        return template_style.convert(self.target_style)
+        return template_style.convert(self.target_template_style.style)
 
 
 DEFAULT_STYLE_HANDLER = StyleHandler(target_template_style=OpenAITemplateStyle)
