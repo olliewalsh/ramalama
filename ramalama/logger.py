@@ -21,4 +21,4 @@ def configure_logger(verbosity="WARNING") -> None:
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(lvl)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    logging.getLogger().addHandler(handler)
