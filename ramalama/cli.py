@@ -24,6 +24,7 @@ except Exception:
 import ramalama.chat as chat
 from ramalama import engine
 from ramalama.chat import default_prefix
+from ramalama.cli_arg_normalization import normalize_pull_arg
 from ramalama.command.factory import assemble_command
 from ramalama.common import accel_image, get_accel, perror
 from ramalama.config import CONFIG, coerce_to_bool, load_file_config
@@ -46,7 +47,6 @@ from ramalama.transports.transport_factory import New, TransportFactory
 from ramalama.version import print_version, version
 
 shortnames = Shortnames()
-
 
 GENERATE_OPTIONS = ["quadlet", "kube", "quadlet/kube", "compose"]
 
@@ -319,6 +319,9 @@ def post_parse_setup(args):
         if getattr(args, "container", None) is True:
             logger.info("MLX runtime automatically uses --nocontainer mode")
         args.container = False
+
+    if hasattr(args, 'pull'):
+        args.pull = normalize_pull_arg(args.pull, getattr(args, 'engine', None))
 
     configure_logger("DEBUG" if args.debug else "WARNING")
 
@@ -1222,7 +1225,7 @@ def daemon_start_cli(args):
         daemon_model_store_dir = "/ramalama/models"
 
         daemon_cmd += [
-            "podman",
+            args.engine,
             "run",
             "--pull",
             args.pull,
@@ -1245,7 +1248,6 @@ def daemon_start_cli(args):
         "--host",
         CONFIG.host if is_daemon_in_container else args.host,
     ]
-
     exec_cmd(daemon_cmd)
 
 

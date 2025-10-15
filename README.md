@@ -141,13 +141,13 @@ The MLX runtime provides optimized inference for Apple Silicon Macs. MLX require
 - macOS operating system
 - Apple Silicon hardware (M1, M2, M3, or later)
 - Usage with `--nocontainer` option (containers are not supported)
-- The `mlx-lm` Python package installed on the host system
+- The `mlx-lm` uv package installed on the host system as a uv tool
 
-To install and run Phi-4 on MLX, use either `uv` or `pip`:
+To install and run Phi-4 on MLX, use `uv`. If `uv` is not installed, you can install it with `curl -LsSf https://astral.sh/uv/install.sh | sh`:
 ```bash
-uv pip install mlx-lm
-# or pip:
-pip install mlx-lm
+uv tool install mlx-lm
+# or upgrade to the latest version:
+uv tool upgrade mlx-lm
 
 ramalama --runtime=mlx serve hf://mlx-community/Unsloth-Phi-4-4bit
 ```
@@ -793,7 +793,7 @@ $ cat /usr/share/ramalama/shortnames.conf
 
 - <details>
     <summary>
-        Log in to ollama registry
+        Log in to Ollama registry
     </summary>
     <br>
 
@@ -832,7 +832,7 @@ $ cat /usr/share/ramalama/shortnames.conf
 
 - <details>
     <summary>
-        Log out from ollama repository
+        Log out from Ollama registry
     </summary>
     <br>
 
@@ -874,7 +874,7 @@ $ cat /usr/share/ramalama/shortnames.conf
     </summary>
     <br>
 
-    You can `pull` a model using the `pull` command. By default, it pulls from the Ollama registry.
+    You can `pull` a model using the `pull` command. By default, it pulls from the <a href="https://ollama.com/library">Ollama registry</a>.
     ```
     $ ramalama pull granite3-moe
     ```
@@ -953,7 +953,7 @@ This command uses a specific container image containing the docling tool to conv
 
 - <details>
     <summary>
-        Run a chatbot on a model using the run command. By default, it pulls from the Ollama registry.
+        Run a chatbot on a model using the run command. By default, it pulls from the <a href="https://ollama.com/library">Ollama registry</a>.
     </summary>
     <br>
 

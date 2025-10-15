@@ -61,32 +61,29 @@ dev = [
     "flake8~=7.0",
     "huggingface_hub~=0.35.0",
     "hypothesis>=6.135.26",
-    "isort~=6.0",
+    "isort~=7.0",
     "pytest~=8.3",
     "wheel~=0.45.0",
     "mypy",
-    "pyyaml",
-    "jsonschema",
-    "jinja2",
     "tox"
 ]
 
 cov = [
+    "ramalama[dev]",
     "pytest-cov",
-    "pyyaml",
-    "jsonschema",
-    "jinja2",
 ]
 
 cov-detailed = [
-    "pytest-cov",
+    "ramalama[cov]",
     "pytest-func-cov",
     "pytest-report",
     "pytest-json",
     "pytest-html",
-    "pyyaml",
-    "jsonschema",
-    "jinja2",
+]
+
+[dependency-groups]
+dev = [
+    "ramalama[cov-detailed]",
 ]
 
 [project.urls]
