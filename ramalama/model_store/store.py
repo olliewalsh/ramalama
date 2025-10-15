@@ -276,30 +276,33 @@ class ModelStore:
         return False
 
     def _ensure_chat_template(self, model_tag: str, snapshot_hash: str):
-        # Give preference to a chat template that has been specified in the file list
-        # If it succeeds, then return. Otherwise continue and try to extract from model file
-        if self._try_convert_existing_chat_template(model_tag, snapshot_hash):
-            return
+        # Give preference to the embedded chat template as it's most likely to be
+        # compatible with llama.cpp
 
-        ref = self.get_ref_file(model_tag)
-        if ref is None:
-            return
-        models = ref.model_files
-        if not models:
-            return
+        def get_embedded_template():
+            ref = self.get_ref_file(model_tag)
+            if ref is None:
+                return
+            models = ref.model_files
+            if not models:
+                return
 
-        # Only the first model file is considered for chat template extraction
-        model_file_path = self.get_blob_file_path(models[0].hash)
-        if not GGUFInfoParser.is_model_gguf(model_file_path):
-            return
+            # Only the first model file is considered for chat template extraction
+            model_file_path = self.get_blob_file_path(models[0].hash)
+            if not GGUFInfoParser.is_model_gguf(model_file_path):
+                return
 
-        # Parse model, first and second parameter are irrelevant here
-        info: GGUFModelInfo = GGUFInfoParser.parse("model", "registry", model_file_path)
-        tmpl = info.get_chat_template()
+            # Parse model, first and second parameter are irrelevant here
+            info: GGUFModelInfo = GGUFInfoParser.parse("model", "registry", model_file_path)
+            return info.get_chat_template()
+
+        tmpl = get_embedded_template()
+        logger.debug(f"Embedded chat template: {tmpl!r}")
         if tmpl is None:
+            self._try_convert_existing_chat_template(model_tag, snapshot_hash)
             return
 
-        needs_conversion = not go2jinja.is_go_template(tmpl)
+        needs_conversion = go2jinja.is_go_template(tmpl)
 
         # Only jinja templates are usable for the supported backends, therefore don't mark file as
         # chat template if it is a Go Template (ollama-specific)
