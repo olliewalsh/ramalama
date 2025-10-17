@@ -91,14 +91,16 @@ class ModelStore:
 
     def get_ref_file(self, model_tag: str) -> Optional[RefJSONFile]:
         ref_file_path = self.get_ref_file_path(model_tag)
-        ref = migrate_reffile_to_refjsonfile(ref_file_path, self.snapshots_directory)
-        if ref is not None:
-            return ref
-
-        if not os.path.exists(ref_file_path):
-            return None
-
-        return RefJSONFile.from_path(ref_file_path)
+        ref_file = migrate_reffile_to_refjsonfile(ref_file_path, self.snapshots_directory)
+        if ref_file is None:
+            if os.path.exists(ref_file_path):
+                ref_file = RefJSONFile.from_path(ref_file_path)
+        if ref_file is not None:
+            if ref_file.version != RefJSONFile.version:
+                # 0.13.0 chat template conversion logic was wrong, force a refresh
+                ref_file.version = RefJSONFile.version
+                self._ensure_chat_template(ref_file, snapshot_hash=ref_file.hash)
+        return ref_file
 
     def update_ref_file(
         self, model_tag: str, snapshot_hash: str = "", snapshot_files: Optional[list[SnapshotFile]] = None
@@ -195,7 +197,7 @@ class ModelStore:
 
         return (ref_file.hash, cached_files, len(cached_files) == len(ref_file.files))
 
-    def _prepare_new_snapshot(self, model_tag: str, snapshot_hash: str, snapshot_files: list[SnapshotFile]):
+    def _prepare_new_snapshot(self, model_tag: str, snapshot_hash: str, snapshot_files: list[SnapshotFile]) -> RefJSONFile:
         validate_snapshot_files(snapshot_files)
         self.ensure_directory_setup()
 
@@ -209,12 +211,9 @@ class ModelStore:
 
         snapshot_directory = self.get_snapshot_directory(snapshot_hash)
         os.makedirs(snapshot_directory, exist_ok=True)
+        return ref_file
 
-    def _download_snapshot_files(self, model_tag: str, snapshot_hash: str, snapshot_files: Sequence[SnapshotFile]):
-        ref_file: None | RefJSONFile = self.get_ref_file(model_tag)
-        if ref_file is None:
-            raise ValueError("Cannot download snapshots without a valid ref file.")
-
+    def _download_snapshot_files(self, ref_file: RefJSONFile, snapshot_hash: str, snapshot_files: Sequence[SnapshotFile]):
         for file in snapshot_files:
             dest_path = self.get_blob_file_path(file.hash)
             blob_relative_path = ""
@@ -247,11 +246,7 @@ class ModelStore:
         # save updated ref file
         ref_file.write_to_file()
 
-    def _try_convert_existing_chat_template(self, model_tag: str, snapshot_hash: str) -> bool:
-        ref_file = self.get_ref_file(model_tag)
-        if ref_file is None:
-            return False
-
+    def _try_convert_existing_chat_template(self, ref_file: RefJSONFile, snapshot_hash: str) -> bool:
         for file in ref_file.chat_templates:
             chat_template_file_path = self.get_blob_file_path(file.hash)
             with open(chat_template_file_path, "r") as template_file:
@@ -270,20 +265,17 @@ class ModelStore:
                     continue
 
             files = [LocalSnapshotFile(normalized_template, "chat_template_converted", SnapshotFileType.ChatTemplate)]
-            self.update_snapshot(model_tag, snapshot_hash, files)
+            self._update_snapshot(ref_file, snapshot_hash, files)
             return True
 
         return False
 
-    def _ensure_chat_template(self, model_tag: str, snapshot_hash: str):
+    def _ensure_chat_template(self, ref_file: RefJSONFile, snapshot_hash: str):
         # Give preference to the embedded chat template as it's most likely to be
         # compatible with llama.cpp
 
         def get_embedded_template():
-            ref = self.get_ref_file(model_tag)
-            if ref is None:
-                return
-            models = ref.model_files
+            models = ref_file.model_files
             if not models:
                 return
 
@@ -299,7 +291,7 @@ class ModelStore:
         tmpl = get_embedded_template()
         logger.debug(f"Embedded chat template: {tmpl!r}")
         if tmpl is None:
-            self._try_convert_existing_chat_template(model_tag, snapshot_hash)
+            self._try_convert_existing_chat_template(ref_file, snapshot_hash)
             return
 
         needs_conversion = go2jinja.is_go_template(tmpl)
@@ -321,8 +313,13 @@ class ModelStore:
                 )
             except Exception as ex:
                 logger.debug(f"Failed to convert Go Template to Jinja: {ex}")
-
-        self.update_snapshot(model_tag, snapshot_hash, files)
+        else:
+            for file in ref_file.files:
+                if file.name == "chat_template_converted":
+                    # Should not exist but 0.13.0 needs_conversion logic was inverted
+                    self._remove_blob_file(self.get_snapshot_file_path(ref_file.hash, file.name))
+                    ref_file.remove_file(file.hash)
+        self._update_snapshot(ref_file, snapshot_hash, files)
 
     def _verify_endianness(self, model_tag: str):
         ref_file = self.get_ref_file(model_tag)
@@ -349,9 +346,9 @@ class ModelStore:
         snapshot_hash = sanitize_filename(snapshot_hash)
 
         try:
-            self._prepare_new_snapshot(model_tag, snapshot_hash, snapshot_files)
-            self._download_snapshot_files(model_tag, snapshot_hash, snapshot_files)
-            self._ensure_chat_template(model_tag, snapshot_hash)
+            ref_file = self._prepare_new_snapshot(model_tag, snapshot_hash, snapshot_files)
+            self._download_snapshot_files(ref_file, model_tag, snapshot_hash, snapshot_files)
+            self._ensure_chat_template(ref_file, model_tag, snapshot_hash)
         except urllib.error.HTTPError as ex:
             perror(f"Failed to fetch required file: {ex}")
             perror("Removing snapshot...")
@@ -371,15 +368,11 @@ class ModelStore:
             self.remove_snapshot(model_tag)
             raise ex
 
-    def update_snapshot(self, model_tag: str, snapshot_hash: str, new_snapshot_files: Sequence[SnapshotFile]) -> bool:
+    def _update_snapshot(self, ref_file: RefJSONFile, snapshot_hash: str, new_snapshot_files: Sequence[SnapshotFile]) -> bool:
         validate_snapshot_files(new_snapshot_files)
         snapshot_hash = sanitize_filename(snapshot_hash)
 
         if not self.directory_setup_exists():
-            return False
-
-        ref_file = self.get_ref_file(model_tag)
-        if ref_file is None:
             return False
 
         # update ref file with deduplication by file hash
@@ -395,7 +388,7 @@ class ModelStore:
                 )
         ref_file.write_to_file()
 
-        self._download_snapshot_files(model_tag, snapshot_hash, new_snapshot_files)
+        self._download_snapshot_files(ref_file, snapshot_hash, new_snapshot_files)
         return True
 
     def _remove_blob_file(self, snapshot_file_path: str):
