@@ -1,4 +1,5 @@
 import argparse
+import copy
 import errno
 import json
 import os
@@ -8,7 +9,9 @@ import sys
 import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
+from textwrap import dedent
 from typing import get_args
+from urllib.parse import urlparse
 
 # if autocomplete doesn't exist, just do nothing, don't break
 try:
@@ -28,6 +31,7 @@ from ramalama.common import accel_image, get_accel, perror
 from ramalama.config import (
     COLOR_OPTIONS,
     CONFIG,
+    GGUF_QUANTIZATION_MODES,
     SUPPORTED_ENGINES,
     SUPPORTED_RUNTIMES,
     coerce_to_bool,
@@ -39,7 +43,7 @@ from ramalama.endian import EndianMismatchError
 from ramalama.logger import configure_logger, logger
 from ramalama.model_inspect.error import ParseError
 from ramalama.model_store.global_store import GlobalModelStore
-from ramalama.rag import Rag, rag_image
+from ramalama.rag import INPUT_DIR, Rag, RagTransport, rag_image
 from ramalama.shortnames import Shortnames
 from ramalama.stack import Stack
 from ramalama.transports.base import (
@@ -168,6 +172,18 @@ def init_cli():
     args = parse_arguments(parser)
     post_parse_setup(args)
     return parser, args
+
+
+def parse_args_from_cmd(cmd: list[str]) -> argparse.Namespace:
+    """Parse arguments based on a command string"""
+    # Need to know if we're running with --dryrun or --generate before adding the subcommands,
+    # otherwise calls to accel_image() when setting option defaults will cause unnecessary image pulls.
+    if any(arg in ("--dryrun", "--dry-run", "--generate") or arg.startswith("--generate=") for arg in sys.argv[1:]):
+        CONFIG.dryrun = True
+    parser = get_parser()
+    args = parser.parse_args(cmd)
+    post_parse_setup(args)
+    return args
 
 
 def get_description():
@@ -573,6 +589,7 @@ def info_cli(args):
             "Engines": {spec: str(path) for spec, path in get_inference_spec_files().items()},
             "Schema": {schema: str(path) for schema, path in get_inference_schema_files().items()},
         },
+        "RagImage": rag_image(CONFIG),
         "Selinux": CONFIG.selinux,
         "Shortnames": {
             "Files": shortnames.paths,
@@ -671,23 +688,35 @@ def convert_parser(subparsers):
     )
     parser.add_argument(
         "--gguf",
-        choices=[
-            "Q2_K",
-            "Q3_K_S",
-            "Q3_K_M",
-            "Q3_K_L",
-            "Q4_0",
-            "Q4_K_S",
-            "Q4_K_M",
-            "Q5_0",
-            "Q5_K_S",
-            "Q5_K_M",
-            "Q6_K",
-            "Q8_0",
-        ],
-        help="GGUF quantization format",
+        choices=get_args(GGUF_QUANTIZATION_MODES),
+        nargs="?",
+        const=CONFIG.gguf_quantization_mode,  # Used if --gguf is provided without value
+        default=None,  # Used if --gguf is not provided
+        help=f"GGUF quantization format. If specified without value, {CONFIG.gguf_quantization_mode} is used.",
     )
     add_network_argument(parser)
+    parser.add_argument(
+        "--rag-image",
+        default=rag_image(CONFIG),
+        help="Image to use for conversion to GGUF",
+        action=OverrideDefaultAction,
+        completer=local_images,
+    )
+    parser.add_argument(
+        "--image",
+        default=accel_image(CONFIG),
+        help="Image to use for quantization",
+        action=OverrideDefaultAction,
+        completer=local_images,
+    )
+    parser.add_argument(
+        "--pull",
+        dest="pull",
+        type=str,
+        default=CONFIG.pull,
+        choices=["always", "missing", "never", "newer"],
+        help="pull image policy",
+    )
     parser.add_argument(
         "--type",
         default="raw",
@@ -715,7 +744,6 @@ def convert_cli(args):
     model = TransportFactory(tgt, args).create_oci()
 
     source_model = _get_source_model(args)
-    args.carimage = rag_image(accel_image(CONFIG))
     model.convert(source_model, args)
 
 
@@ -942,9 +970,16 @@ If GPU device on host is accessible to via group access, this option leaks the u
         choices=["always", "missing", "never", "newer"],
         help='pull image policy',
     )
-    if command in ["serve"]:
+    if command in ["run", "serve"]:
         parser.add_argument(
             "--rag", help="RAG vector database or OCI Image to be served with the model", completer=local_models
+        )
+        parser.add_argument(
+            "--rag-image",
+            default=rag_image(CONFIG),
+            help="OCI container image to run with the specified RAG data",
+            action=OverrideDefaultAction,
+            completer=local_images,
         )
     if command in ["perplexity", "run", "serve"]:
         parser.add_argument(
@@ -1020,7 +1055,6 @@ def chat_run_options(parser):
         help='possible values are "never", "always" and "auto".',
     )
     parser.add_argument("--prefix", type=str, help="prefix for the user prompt", default=default_prefix())
-    parser.add_argument("--rag", type=str, help="a file or directory to use as context for the chat")
     parser.add_argument("--mcp", nargs="*", help="MCP servers to use for the chat")
 
 
@@ -1042,10 +1076,32 @@ def chat_parser(subparsers):
     )
     parser.add_argument("--url", type=str, default="http://127.0.0.1:8080/v1", help="the url to send requests to")
     parser.add_argument("--model", "-m", type=str, completer=local_models, help="model for inferencing")
+    parser.add_argument("--rag", type=str, help="a file or directory to use as context for the chat")
     parser.add_argument(
         "ARGS", nargs="*", help="overrides the default prompt, and the output is returned without entering the chatbot"
     )
     parser.set_defaults(func=chat.chat)
+
+
+def _rag_args(args):
+    args.noout = not args.debug
+    rag_args = copy.copy(args)
+    rag_args.subcommand = f"{args.subcommand} --rag"
+    rag_args.MODEL = args.rag
+    rag_args.image = args.rag_image
+    if args.engine == "podman":
+        rag_args.model_host = "host.containers.internal"
+    else:
+        rag_args.model_host = f"host.{args.engine}.internal"
+    # If --name was specified, use it for the RAG proxy
+    args.name = None
+    # If --port was specified, use it for the RAG proxy, and
+    # select a random port for the model
+    args.port = None
+    rag_args.model_port = args.port = compute_serving_port(args, exclude=[rag_args.port])
+    rag_args.model_args = args
+    rag_args.generate = ""
+    return rag_args
 
 
 def run_parser(subparsers):
@@ -1065,36 +1121,29 @@ def run_parser(subparsers):
 
 
 def run_cli(args):
-    if args.rag:
-        _get_rag(args)
-        # Passing default args for serve (added network bridge for internet access)
-        args.port = CONFIG.port
-        args.host = CONFIG.host
-        args.network = 'bridge'
-        args.generate = None
-
     try:
         # detect available port and update arguments
         args.port = compute_serving_port(args)
 
         model = New(args.MODEL, args)
         model.ensure_model_exists(args)
-        if args.rag:
-            return model.serve(args, assemble_command(args))
-        model.run(args, assemble_command(args))
-
     except KeyError as e:
         logger.debug(e)
         try:
             args.quiet = True
-            oci_model = TransportFactory(args.MODEL, args, ignore_stderr=True).create_oci()
-            oci_model.ensure_model_exists(args)
-
-            if args.rag:
-                return oci_model.serve(args, assemble_command(args))
-            oci_model.run(args, assemble_command(args))
+            model = TransportFactory(args.MODEL, args, ignore_stderr=True).create_oci()
+            model.ensure_model_exists(args)
         except Exception as exc:
             raise e from exc
+
+    if args.rag:
+        if not args.container:
+            raise ValueError("ramalama run --rag cannot be run with the --nocontainer option.")
+        args = _rag_args(args)
+        model = RagTransport(model, assemble_command(args.model_args), args)
+        model.ensure_model_exists(args)
+
+    model.run(args, assemble_command(args))
 
 
 def serve_parser(subparsers):
@@ -1104,22 +1153,9 @@ def serve_parser(subparsers):
     parser.set_defaults(func=serve_cli)
 
 
-def _get_rag(args):
-    if os.path.exists(args.rag):
-        return
-    if args.pull == "never" or args.dryrun:
-        return
-    model = New(args.rag, args=args, transport="oci")
-    if not model.exists():
-        model.pull(args)
-
-
 def serve_cli(args):
     if not args.container:
         args.detach = False
-
-    if args.rag:
-        _get_rag(args)
 
     if args.api == "llama-stack":
         if not args.container:
@@ -1134,15 +1170,22 @@ def serve_cli(args):
 
         model = New(args.MODEL, args)
         model.ensure_model_exists(args)
-        model.serve(args, assemble_command(args))
     except KeyError as e:
         try:
             args.quiet = True
             model = TransportFactory(args.MODEL, args, ignore_stderr=True).create_oci()
             model.ensure_model_exists(args)
-            model.serve(args, assemble_command(args))
         except Exception:
             raise e
+
+    if args.rag:
+        if not args.container:
+            raise ValueError("ramalama serve --rag cannot be run with the --nocontainer option.")
+        args = _rag_args(args)
+        model = RagTransport(model, assemble_command(args.model_args), args)
+        model.ensure_model_exists(args)
+
+    model.serve(args, assemble_command(args))
 
 
 def stop_parser(subparsers):
@@ -1273,6 +1316,18 @@ def version_parser(subparsers):
     parser.set_defaults(func=print_version)
 
 
+class AddPathOrUrl(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, [])
+        namespace.urls = []
+        for value in values:
+            parsed = urlparse(value)
+            if parsed.scheme in ["file", ""] and parsed.netloc == "":
+                getattr(namespace, self.dest).append(parsed.path.rstrip("/"))
+            else:
+                namespace.urls.append(value)
+
+
 def rag_parser(subparsers):
     parser = subparsers.add_parser(
         "rag",
@@ -1295,8 +1350,8 @@ def rag_parser(subparsers):
     )
     parser.add_argument(
         "--image",
-        default=accel_image(CONFIG),
-        help="OCI container image to run with the specified AI model",
+        default=rag_image(CONFIG),
+        help="Image to use for generating RAG data",
         action=OverrideDefaultAction,
         completer=local_images,
     )
@@ -1324,11 +1379,14 @@ If GPU device on host is accessible to via group access, this option leaks the u
         help="Enable SELinux container separation",
     )
     parser.add_argument(
-        "PATH",
-        nargs="*",
-        help="""\
-Files/Directory containing PDF, DOCX, PPTX, XLSX, HTML, AsciiDoc & Markdown
-formatted files to be processed""",
+        "PATHS",
+        nargs="+",
+        help=dedent(
+            """
+        Files/URLs/Directory containing PDF, DOCX, PPTX, XLSX, HTML, AsciiDoc & Markdown
+        formatted files to be processed"""
+        ),
+        action=AddPathOrUrl,
     )
     parser.add_argument(
         "DESTINATION", help="Path or OCI Image name to contain processed rag data", completer=suppressCompleter
@@ -1345,7 +1403,8 @@ formatted files to be processed""",
 
 def rag_cli(args):
     rag = Rag(args.DESTINATION)
-    rag.generate(args)
+    args.inputdir = INPUT_DIR
+    rag.generate(args, assemble_command(args))
 
 
 def rm_parser(subparsers):

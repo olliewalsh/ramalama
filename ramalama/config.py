@@ -15,9 +15,25 @@ DEFAULT_PORT_RANGE: tuple[int, int] = (8080, 8090)
 DEFAULT_PORT: int = DEFAULT_PORT_RANGE[0]
 DEFAULT_IMAGE: str = "quay.io/ramalama/ramalama"
 DEFAULT_STACK_IMAGE: str = "quay.io/ramalama/llama-stack"
+DEFAULT_RAG_IMAGE: str = "quay.io/ramalama/ramalama-rag"
 SUPPORTED_ENGINES: TypeAlias = Literal["podman", "docker"]
 SUPPORTED_RUNTIMES: TypeAlias = Literal["llama.cpp", "vllm", "mlx"]
 COLOR_OPTIONS: TypeAlias = Literal["auto", "always", "never"]
+GGUF_QUANTIZATION_MODES: TypeAlias = Literal[
+    "Q2_K",
+    "Q3_K_S",
+    "Q3_K_M",
+    "Q3_K_L",
+    "Q4_0",
+    "Q4_K_S",
+    "Q4_K_M",
+    "Q5_0",
+    "Q5_K_S",
+    "Q5_K_M",
+    "Q6_K",
+    "Q8_0",
+]
+DEFAULT_GGUF_QUANTIZATION_MODE = "Q4_K_M"
 
 DEFAULT_CONFIG_DIRS = [
     Path(f"{sys.prefix}/share/ramalama"),
@@ -121,6 +137,7 @@ class BaseConfig:
     container: bool = None  # type: ignore
     ctx_size: int = 0
     default_image: str = DEFAULT_IMAGE
+    default_rag_image: str = DEFAULT_RAG_IMAGE
     dryrun: bool = False
     engine: SUPPORTED_ENGINES | None = field(default_factory=get_default_engine)
     env: list[str] = field(default_factory=list)
@@ -136,6 +153,14 @@ class BaseConfig:
             "INTEL_VISIBLE_DEVICES": "quay.io/ramalama/intel-gpu",
             "MUSA_VISIBLE_DEVICES": "quay.io/ramalama/musa",
             "VLLM": "registry.redhat.io/rhelai1/ramalama-vllm",
+        }
+    )
+    rag_image: str | None = None
+    rag_images: dict[str, str] = field(
+        default_factory=lambda: {
+            "CUDA_VISIBLE_DEVICES": "quay.io/ramalama/cuda-rag",
+            "HIP_VISIBLE_DEVICES": "quay.io/ramalama/rocm-rag",
+            "INTEL_VISIBLE_DEVICES": "quay.io/ramalama/intel-gpu-rag",
         }
     )
     keep_groups: bool = False
@@ -157,6 +182,7 @@ class BaseConfig:
     transport: str = "ollama"
     user: UserConfig = field(default_factory=UserConfig)
     verify: bool = True
+    gguf_quantization_mode: GGUF_QUANTIZATION_MODES = DEFAULT_GGUF_QUANTIZATION_MODE
 
     def __post_init__(self):
         self.container = coerce_to_bool(self.container) if self.container is not None else self.engine is not None
@@ -247,8 +273,9 @@ def load_env_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     if 'env' in config:
         config['env'] = config['env'].split(',')
 
-    if 'images' in config:
-        config['images'] = json.loads(config['images'])
+    for key in ['images', 'rag_images']:
+        if key in config:
+            config[key] = json.loads(config[key])
 
     for key in ['ocr', 'keep_groups', 'container', 'verify']:
         if key in config:

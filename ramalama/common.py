@@ -135,7 +135,7 @@ def exec_cmd(args, stdout2null: bool = False, stderr2null: bool = False):
         raise
 
 
-def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_all=False, encoding=None):
+def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_all=False, encoding=None, env=None):
     """
     Run the given command arguments.
 
@@ -151,6 +151,7 @@ def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_
     logger.debug(f"Working directory: {cwd}")
     logger.debug(f"Ignore stderr: {ignore_stderr}")
     logger.debug(f"Ignore all: {ignore_all}")
+    logger.debug(f"env: {env}")
 
     serr = None
     if ignore_all or ignore_stderr:
@@ -160,7 +161,10 @@ def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_
     if ignore_all:
         sout = subprocess.DEVNULL
 
-    result = subprocess.run(args, check=True, cwd=cwd, stdout=sout, stderr=serr, encoding=encoding)
+    if env:
+        env = os.environ | env
+
+    result = subprocess.run(args, check=True, cwd=cwd, stdout=sout, stderr=serr, encoding=encoding, env=env)
     logger.debug(f"Command finished with return code: {result.returncode}")
 
     return result
@@ -429,6 +433,10 @@ def check_ascend() -> Literal["cann"] | None:
 
 
 def check_rocm_amd() -> Literal["hip"] | None:
+    if is_arm():
+        # ROCm is not available for arm64, use Vulkan instead
+        return None
+
     gpu_num = 0
     gpu_bytes = 0
     for i, (np, props) in enumerate(amdkfd.gpus()):
@@ -455,6 +463,10 @@ def check_rocm_amd() -> Literal["hip"] | None:
         return "hip"
 
     return None
+
+
+def is_arm() -> bool:
+    return platform.machine() in ('arm64', 'aarch64')
 
 
 def check_intel() -> Literal["intel"] | None:
@@ -661,30 +673,36 @@ AccelImageArgs: TypeAlias = (
 )
 
 
-def accel_image(config: Config) -> str:
+def accel_image(config: Config, images: dict[str, str] = None, conf_key: str = "image") -> str:
     """
     Selects and the appropriate image based on config, arguments, environment.
+    "images" is a mapping of environment variable names to image names. If not specified, the
+    mapping from default config will be used.
+    "conf_key" is the configuration key that holds the configured value of the selected image.
+    If not specified, it defaults to "image".
     """
     # User provided an image via config
-    if config.is_set("image"):
-        return tagged_image(config.image)
+    if config.is_set(conf_key):
+        return tagged_image(getattr(config, conf_key))
+
+    if not images:
+        images = config.images
 
     if config.runtime == "vllm":
         return config.images["VLLM"]
 
     set_gpu_type_env_vars()
-    gpu_type = next(iter(get_gpu_type_env_vars()), None)
+    gpu_type = next(iter(get_gpu_type_env_vars()), "")
 
     # Get image based on detected GPU type
-    image = config.images.get(gpu_type or "", config.default_image)  # the or "" is just to keep mypy happy
+    image = images.get(gpu_type, getattr(config, f"default_{conf_key}"))
 
     # If the image from the config is specified by tag or digest, return it unmodified
     if ":" in image:
         return image
 
     # Special handling for CUDA images based on version - only if the image is the default CUDA image
-    cuda_image = config.images.get("CUDA_VISIBLE_DEVICES")
-    if image == cuda_image:
+    if conf_key == "image" and image == images.get("CUDA_VISIBLE_DEVICES"):
         try:
             image = select_cuda_image(config)
         except NotImplementedError as e:

@@ -250,6 +250,8 @@ jobs:
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '<3.14'
 
       - name: install mlx-lm
         shell: bash
@@ -426,6 +428,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           activate-environment: true
+          python-version: '<3.14'
 
       - name: install mlx-lm
         shell: bash
