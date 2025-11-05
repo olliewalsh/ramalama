@@ -98,10 +98,10 @@ def test_compute_ports():
 @pytest.mark.parametrize(
     "exclude,count,first",
     [
-        (None, 11, DEFAULT_PORT),
-        ([], 11, DEFAULT_PORT),
-        ([str(DEFAULT_PORT)], 10, DEFAULT_PORT + 1),
-        ([str(DEFAULT_PORT), str(DEFAULT_PORT + 1)], 9, DEFAULT_PORT + 2),
+        (None, 101, DEFAULT_PORT),
+        ([], 101, DEFAULT_PORT),
+        ([str(DEFAULT_PORT)], 100, DEFAULT_PORT + 1),
+        ([str(DEFAULT_PORT), str(DEFAULT_PORT + 1)], 99, DEFAULT_PORT + 2),
         (list(map(str, range(*DEFAULT_PORT_RANGE))), 1, DEFAULT_PORT_RANGE[1]),
     ],
 )
@@ -137,9 +137,17 @@ def test_compute_ports_exclude(exclude: list, count: int, first: int):
     ],
 )
 def test_compute_serving_port(
-    inputPort: str, expectedRandomizedResult: list, expectedRandomPortsAvl: list, expectedOutput: str, expectedErr
+    inputPort: str,
+    expectedRandomizedResult: list,
+    expectedRandomPortsAvl: list,
+    expectedOutput: str,
+    expectedErr,
 ):
     args = Namespace(port=inputPort, debug=False, api="")
+    # Set port_override if user specified a port (not empty or None)
+    if inputPort and inputPort != "":
+        args.port_override = True
+
     mock_socket = socket.socket
     mock_socket.bind = MagicMock(side_effect=expectedRandomPortsAvl)
     mock_compute_ports = Mock(return_value=expectedRandomizedResult)
@@ -294,7 +302,7 @@ class TestOCIModelSetupMounts:
     @patch('ramalama.transports.base.populate_volume_from_image')
     def test_setup_mounts_oci_docker(self, mock_populate_volume, oci_model, mock_engine):
         """Test OCI model mounting with Docker (volume mount using populate_volume_from_image)"""
-        args = Namespace(dryrun=False, container=True, generate=False)
+        args = Namespace(dryrun=False, container=True, generate=False, engine="docker")
         mock_engine.use_podman = False
         mock_engine.use_docker = True
         oci_model.engine = mock_engine
@@ -308,6 +316,7 @@ class TestOCIModelSetupMounts:
         mock_populate_volume.assert_called_once()
         call_args = mock_populate_volume.call_args
         assert call_args[0][0] == oci_model  # model argument
+        assert call_args[0][1] is args
 
         # Verify mount command was added
         expected_mount = f"--mount=type=volume,src={mock_volume_name},dst={MNT_DIR},readonly"

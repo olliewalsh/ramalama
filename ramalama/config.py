@@ -11,8 +11,6 @@ from ramalama.layered_config import LayeredMixin
 from ramalama.toml_parser import TOMLParser
 
 PathStr: TypeAlias = str
-DEFAULT_PORT_RANGE: tuple[int, int] = (8080, 8090)
-DEFAULT_PORT: int = DEFAULT_PORT_RANGE[0]
 DEFAULT_IMAGE: str = "quay.io/ramalama/ramalama"
 DEFAULT_STACK_IMAGE: str = "quay.io/ramalama/llama-stack"
 DEFAULT_RAG_IMAGE: str = "quay.io/ramalama/ramalama-rag"
@@ -33,7 +31,7 @@ GGUF_QUANTIZATION_MODES: TypeAlias = Literal[
     "Q6_K",
     "Q8_0",
 ]
-DEFAULT_GGUF_QUANTIZATION_MODE = "Q4_K_M"
+DEFAULT_GGUF_QUANTIZATION_MODE: GGUF_QUANTIZATION_MODES = "Q4_K_M"
 
 DEFAULT_CONFIG_DIRS = [
     Path(f"{sys.prefix}/share/ramalama"),
@@ -131,7 +129,7 @@ class RamalamaSettings:
 @dataclass
 class BaseConfig:
     api: str = "none"
-    api_key: str = None
+    api_key: str | None = None
     cache_reuse: int = 256
     carimage: str = "registry.access.redhat.com/ubi10-micro:latest"
     container: bool = None  # type: ignore
@@ -167,7 +165,7 @@ class BaseConfig:
     max_tokens: int = 0
     ngl: int = -1
     ocr: bool = False
-    port: str = str(DEFAULT_PORT)
+    port: str = "8080"
     prefix: str = None  # type: ignore
     pull: str = "newer"
     rag_format: Literal["qdrant", "json", "markdown", "milvus"] = "qdrant"
@@ -293,3 +291,5 @@ def default_config(env: Mapping[str, str] | None = None) -> Config:
 
 
 CONFIG = default_config()
+DEFAULT_PORT: int = int(CONFIG.port)
+DEFAULT_PORT_RANGE: tuple[int, int] = (DEFAULT_PORT, DEFAULT_PORT + 100)

@@ -92,7 +92,7 @@ def parse_port_option(option: str) -> str:
     port = int(option)
     if port <= 0 or port >= 65535:
         raise ValueError(f"Invalid port '{port}'")
-    return str(port)
+    return option
 
 
 class OverrideDefaultAction(argparse.Action):
@@ -950,12 +950,13 @@ If GPU device on host is accessible to via group access, this option leaks the u
         help="override the default OCI runtime used to launch the container",
         completer=suppressCompleter,
     )
-    if command == "serve":
+    if command in ["run", "serve"]:
         parser.add_argument(
             "-p",
             "--port",
             type=parse_port_option,
             default=CONFIG.port,
+            action=OverrideDefaultAction,
             help="port for AI Model server to listen on",
             completer=suppressCompleter,
         )
@@ -1211,7 +1212,7 @@ def stop_container(args):
         engine.stop_container(args, i)
 
 
-def daemon_parser(subparsers):
+def daemon_parser(subparsers) -> None:
     parser: ArgumentParserWithDefaults = subparsers.add_parser("daemon", help="daemon operations")
     parser.set_defaults(func=lambda _: parser.print_help())
 
@@ -1500,7 +1501,7 @@ def inspect_cli(args):
     model.inspect(args.all, args.get == "all", args.get, args.json, args.dryrun)
 
 
-def main():
+def main() -> None:
     def eprint(e, exit_code):
         perror("Error: " + str(e).strip("'\""))
         sys.exit(exit_code)
@@ -1519,7 +1520,7 @@ def main():
         if not args.subcommand:
             parser.print_usage()
             perror("ramalama: requires a subcommand")
-            return 0
+            return
 
         args.func(args)
     except urllib.error.HTTPError as e:

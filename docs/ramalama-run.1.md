@@ -29,7 +29,7 @@ URL support means if a model is on a web site or even on your local system, you 
 
 #### **--api**=**llama-stack** | none**
 unified API layer for Inference, RAG, Agents, Tools, Safety, Evals, and Telemetry.(default: none)
-The default can be overridden in the ramalama.conf file.
+The default can be overridden in the `ramalama.conf` file.
 
 #### **--authfile**=*password*
 path of the authentication file for OCI registries
@@ -73,9 +73,9 @@ OCI container image to run with specified AI model. RamaLama defaults to using
 images based on the accelerator it discovers. For example:
 `quay.io/ramalama/ramalama`. See the table below for all default images.
 The default image tag is based on the minor version of the RamaLama package.
-Version 0.13.0 of RamaLama pulls an image with a `:0.12` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
+Version 0.14.0 of RamaLama pulls an image with a `:0.14` tag from the quay.io/ramalama OCI repository. The --image option overrides this default.
 
-The default can be overridden in the ramalama.conf file or via the
+The default can be overridden in the `ramalama.conf` file or via the
 RAMALAMA_IMAGE environment variable. `export RAMALAMA_IMAGE=quay.io/ramalama/aiimage:1.2` tells
 RamaLama to use the `quay.io/ramalama/aiimage:1.2` image.
 
@@ -128,6 +128,11 @@ use. Using this option RamaLama will override these defaults.
 
 On Nvidia based GPU systems, RamaLama defaults to using the
 `nvidia-container-runtime`. Use this option to override this selection.
+
+#### **--port**, **-p**=*port*
+Port for AI Model server to listen on (default: 8080)
+
+The default can be overridden in the `ramalama.conf` file.
 
 #### **--prefix**
 Prefix for the user prompt (default: 🦭 > )
@@ -214,6 +219,12 @@ ramalama run --keepalive 10m file:///tmp/mymodel
 >
 ```
 
+Run command with a custom port to allow multiple models running simultaneously
+```
+ramalama run --port 8081 granite
+>
+```
+
 ```
 ramalama run merlinite "when is the summer solstice"
 The summer solstice, which is the longest day of the year, will happen on June ...
@@ -245,7 +256,7 @@ $ ramalama run granite
 See **[ramalama-cuda(7)](ramalama-cuda.7.md)** for setting up the host Linux system for CUDA support.
 
 ## SEE ALSO
-**[ramalama(1)](ramalama.1.md)**, **[ramalama-cuda(7)](ramalama-cuda.7.md)**
+**[ramalama(1)](ramalama.1.md)**, **[ramalama-cuda(7)](ramalama-cuda.7.md)**, **[ramalama.conf(5)](ramalama.conf.5.md)**
 
 ## HISTORY
 Aug 2024, Originally compiled by Dan Walsh <dwalsh@redhat.com>

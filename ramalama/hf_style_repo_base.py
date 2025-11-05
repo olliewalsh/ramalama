@@ -90,6 +90,7 @@ class HFStyleRepository(ABC):
         files = []
         if self.model_filename not in cached_files:
             files.append(self.model_file())
+        assert self.model_filename
         if is_split_file_model(self.model_filename):
             # If the model is split, we need to add all parts
             match = re.match(SPLIT_MODEL_PATH_RE, self.model_filename)
@@ -127,6 +128,8 @@ class HFStyleRepository(ABC):
         return files
 
     def model_file(self) -> SnapshotFile:
+        assert self.model_filename
+        assert self.model_hash
         return SnapshotFile(
             url=f"{self.blob_url}/{self.model_filename}",
             header=self.headers,
@@ -138,6 +141,8 @@ class HFStyleRepository(ABC):
         )
 
     def mmproj_file(self) -> SnapshotFile:
+        assert self.model_filename
+        assert self.model_hash
         return SnapshotFile(
             url=f"{self.blob_url}/{self.mmproj_filename}",
             header=self.headers,
@@ -234,10 +239,18 @@ class HFStyleRepoModel(Transport, ABC):
         """Collect files from CLI download"""
         pass
 
+    def get_login_args(self):
+        """Return the login subcommand arguments. Can be overridden for different CLI structures."""
+        return ["login"]
+
+    def get_logout_args(self):
+        """Return the logout subcommand arguments. Can be overridden for different CLI structures."""
+        return ["logout"]
+
     def login(self, args):
         if not available(self.get_cli_command()):
             raise NotImplementedError(self.get_missing_message())
-        conman_args = [self.get_cli_command(), "login"]
+        conman_args = [self.get_cli_command()] + self.get_login_args()
         if args.token:
             conman_args.extend(["--token", args.token])
         self.exec(conman_args, args)
@@ -245,7 +258,7 @@ class HFStyleRepoModel(Transport, ABC):
     def logout(self, args):
         if not available(self.get_cli_command()):
             raise NotImplementedError(self.get_missing_message())
-        conman_args = [self.get_cli_command(), "logout"]
+        conman_args = [self.get_cli_command()] + self.get_logout_args()
         if args.token:
             conman_args.extend(["--token", args.token])
         self.exec(conman_args, args)
