@@ -184,8 +184,8 @@ RamaLama supports multiple AI model registries types called transports.
 | HuggingFace              | [`huggingface.co`](https://www.huggingface.co)       |
 | ModelScope               | [`modelscope.cn`](https://www.modelscope.cn)         |
 | Ollama                   | [`ollama.com`](https://www.ollama.com)               |
+| RamaLama Labs Container Registry | [`ramalama.com`](https://registry.ramalama.com) |
 | OCI Container Registries | [`opencontainers.org`](https://opencontainers.org)   |
-| RamaLama Labs Container Registry                      | [`ramalama.com`](https://registry.ramalama.com/projects/ramalama) |
 |                          |Examples: [`quay.io`](https://quay.io),  [`Docker Hub`](https://docker.io), [`Pulp`](https://pulpproject.org), and [`Artifactory`](https://jfrog.com/artifactory/)|
 
 ### Default Transport
@@ -1211,10 +1211,16 @@ and
 [PRs](https://github.com/containers/ramalama/pulls)
 tracking system.
 
+### Community / Developer Meetups
+
+We host a public community and developer meetup on Discord every other week to discuss project direction and provide an open forum for users to get help, ask questions, and showcase new features.
+
+[**Join on Discord**](https://discord.gg/MkCXuTRBUn)
+[**Meeting Agenda**](https://docs.google.com/document/d/1wiqn7ItKgc8BgyTUQ46eeY23ms_hWbkhAoiP9D1ClfY/edit?tab=t.0#heading=h.b1x47hb6d0pt)
+
 ## Roadmap
 
 See the full [Roadmap](./Roadmap.md).
-
 
 ## Contributors
 
