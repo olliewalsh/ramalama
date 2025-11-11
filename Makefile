@@ -122,12 +122,12 @@ endif
 
 .PHONY: check-format
 check-format:
-	black --check --diff $(PROJECT_DIR) $(PYTHON_SCRIPTS)
+	black --required-version 25.9.0 --check --diff $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 	isort --check --diff $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 
 .PHONY: format
 format:
-	black $(PROJECT_DIR) $(PYTHON_SCRIPTS)
+	black --required-version 25.9.0 $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 	isort $(PROJECT_DIR) $(PYTHON_SCRIPTS)
 
 .PHONY: codespell

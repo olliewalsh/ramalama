@@ -56,7 +56,7 @@ text = "MIT"
 dev = [
     # "pytest>=7.0",
     "argcomplete~=3.0",
-    "black~=25.0",
+    "black==25.9.0",
     "codespell~=2.0",
     "flake8~=7.0",
     "huggingface_hub~=1.1.2",
