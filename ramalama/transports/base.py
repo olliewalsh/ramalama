@@ -1,3 +1,4 @@
+import copy
 import os
 import platform
 import random
@@ -412,13 +413,17 @@ class Transport(TransportBase):
             args.prefix = "🍏 > "
         args.pid2kill = ""
 
+        # Model name in the chat request must match RamalamaModelContext.alias()
+        chat_args = copy.deepcopy(args)
+        chat_args.model = f"{self.model_organization}/{self.model_name}"
+
         if args.container:
-            return self._handle_container_chat(args, server_pid)
+            return self._handle_container_chat(chat_args, server_pid)
         else:
             args.pid2kill = server_pid
             if getattr(args, "runtime", None) == "mlx":
-                return self._handle_mlx_chat(args)
-            chat.chat(args)
+                return self._handle_mlx_chat(chat_args)
+            chat.chat(chat_args)
             return 0
 
     def chat_operational_args(self, args):
