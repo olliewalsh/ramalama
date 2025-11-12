@@ -309,8 +309,8 @@ class RamaLamaShell(cmd.Cmd):
             data["temperature"] = float(self.args.temp)
         if getattr(self.args, "max_tokens", None):
             data["max_completion_tokens"] = self.args.max_tokens
-        # For MLX runtime, omit explicit model to allow server default ("default_model")
-        if getattr(self.args, "runtime", None) != "mlx" and self.args.model is not None:
+        # For MLX/vLLM runtime, omit explicit model to allow server default ("default_model")
+        if getattr(self.args, "runtime", None) not in ["mlx", "vllm"] and self.args.model is not None:
             data["model"] = self.args.model
 
         json_data = json.dumps(data).encode("utf-8")
