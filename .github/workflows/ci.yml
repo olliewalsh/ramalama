@@ -72,6 +72,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: Build a container for CPU inferencing
         shell: bash
@@ -98,6 +99,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -105,6 +111,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: Run unit tests
         run: |
@@ -139,6 +146,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -146,6 +158,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: run bats
         run: |
@@ -177,6 +190,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -184,6 +202,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: run bats-nocontainer
         run: |
@@ -212,6 +231,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -219,6 +243,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: Free Disk Space Linux
         shell: bash
@@ -307,6 +332,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -314,6 +344,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: run e2e-tests
         run: |
@@ -348,6 +379,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -355,6 +391,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: run e2e-tests-nocontainer
         run: |
@@ -387,6 +424,11 @@ jobs:
       - name: Upgrade to podman 5
         run: |
            set -e
+           # /mnt has ~ 65 GB free disk space. / is too small.
+           sudo mkdir -m a=rwx -p /mnt/tmp /mnt/runner
+           sudo mkdir -m o=rwx -p /home/runner/.local
+           sudo chown runner:runner /mnt/runner /home/runner/.local
+           sudo mount --bind /mnt/runner /home/runner/.local
            # Enable universe repository which contains podman
            sudo add-apt-repository "deb http://old-releases.ubuntu.com/ubuntu oracular universe"
            # Update package lists
@@ -394,6 +436,7 @@ jobs:
            sudo apt-get purge firefox
            # Install specific podman version
            sudo apt-get upgrade -y podman crun
+           sudo apt-get clean
 
       - name: Free Disk Space Linux
         shell: bash
