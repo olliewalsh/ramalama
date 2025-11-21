@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from test.conftest import ramalama_container_engine
+from ramalama.config import get_cli_with_prefix
 
 import pytest
 
@@ -63,6 +64,7 @@ def container_registry():
 
         # Start the registry
         subprocess.run(
+            get_cli_with_prefix(
             [
                 # fmt: off
                 ramalama_container_engine, "run", "-d", "--rm",
@@ -76,7 +78,7 @@ def container_registry():
                 "-e", "REGISTRY_HTTP_TLS_KEY=/auth/domain.key",
                 registry_image,
                 # fmt: on
-            ],
+            ]),
             check=True,
         )
         time.sleep(2)
@@ -90,4 +92,4 @@ def container_registry():
                 port=registry_port,
             )
         finally:
-            subprocess.run([ramalama_container_engine, "stop", registry_name], check=False)
+            subprocess.run(get_cli_with_prefix([ramalama_container_engine, "stop", registry_name]), check=False)

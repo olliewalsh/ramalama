@@ -66,11 +66,15 @@ def _get_default_config_dirs() -> list[Path]:
 
 DEFAULT_CONFIG_DIRS = _get_default_config_dirs()
 
+def get_cli_with_prefix(args: list[str] ) -> str | None:
+    if os.path.exists("/run/.toolboxenv"):
+        #return ["flatpak-spawn", "--host"] + args
+        if args[0] == "podman":
+            args[0] = "podman-remote"
+    return args
 
 def get_default_engine() -> SUPPORTED_ENGINES | None:
     """Determine the container manager to use based on environment and platform."""
-    if os.path.exists("/run/.toolboxenv"):
-        return None
 
     if available("podman"):
         return "podman"

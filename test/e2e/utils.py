@@ -19,6 +19,7 @@ class RamalamaExecWorkspace:
         self.isolated = isolated
         self.config = config
         self.environ = os.environ.copy()
+        #self.workspace_dir = tempfile.mkdtemp(dir=Path.home()) if self.isolated or self.config else None
         self.workspace_dir = tempfile.mkdtemp() if self.isolated or self.config else None
         self.storage_dir = None
         self.__prev_working_dir = None

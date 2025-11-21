@@ -13,6 +13,7 @@ from typing import Any, Callable
 import ramalama.common
 from ramalama.common import check_nvidia, exec_cmd, get_accel_env_vars, perror, run_cmd
 from ramalama.logger import logger
+from ramalama.config import get_cli_with_prefix
 
 
 class BaseEngine(ABC):
@@ -52,7 +53,7 @@ class BaseEngine(ABC):
             try:
                 if not self.args.quiet:
                     perror(f"Checking for newer image {self.args.image}")
-                run_cmd([str(self.args.engine), "pull", "-q", self.args.image], ignore_all=True)
+                run_cmd(get_cli_with_prefix([str(self.args.engine), "pull", "-q", self.args.image]), ignore_all=True)
             except Exception:  # Ignore errors, the run command will handle it.
                 pass
         elif getattr(self.args, "pull", None):
@@ -125,14 +126,14 @@ class BaseEngine(ABC):
         dry_run(self.exec_args)
 
     def run(self):
-        run_cmd(self.exec_args, stdout=None)
+        run_cmd(get_cli_with_prefix(self.exec_args), stdout=None)
 
     def run_process(self) -> subprocess.CompletedProcess:
         """Run the command and return the CompletedProcess."""
-        return run_cmd(self.exec_args, encoding="utf-8")
+        return run_cmd(get_cli_with_prefix(self.exec_args), encoding="utf-8")
 
     def exec(self, stdout2null: bool = False, stderr2null: bool = False):
-        exec_cmd(self.exec_args, stdout2null, stderr2null)
+        exec_cmd(get_cli_with_prefix(self.exec_args), stdout2null, stderr2null)
 
     def relabel(self):
         if getattr(self.args, "selinux", False) and self.use_podman:
@@ -281,7 +282,7 @@ def images(args):
         conman_args += [f"--format={args.format}"]
 
     try:
-        output = run_cmd(conman_args).stdout.decode("utf-8").strip()
+        output = run_cmd(get_cli_with_prefix(conman_args)).stdout.decode("utf-8").strip()
         if output == "":
             return []
         return output.split("\n")
@@ -310,7 +311,7 @@ def containers(args):
         conman_args += [f"--format={args.format}"]
 
     try:
-        output = run_cmd(conman_args).stdout.decode("utf-8").strip()
+        output = run_cmd(get_cli_with_prefix(conman_args)).stdout.decode("utf-8").strip()
         if output == "":
             return []
         return output.split("\n")
@@ -326,7 +327,7 @@ def info(args):
 
     conman_args = [conman, "info", "--format", "json"]
     try:
-        output = run_cmd(conman_args).stdout.decode("utf-8").strip()
+        output = run_cmd(get_cli_with_prefix(conman_args)).stdout.decode("utf-8").strip()
         if output == "":
             return []
         return json.loads(output)
@@ -346,7 +347,7 @@ def inspect(args, name, format=None, ignore_stderr=False):
         conman_args += ["--format", format]
 
     conman_args += [name]
-    return run_cmd(conman_args, ignore_stderr=ignore_stderr).stdout.decode("utf-8").strip()
+    return run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=ignore_stderr).stdout.decode("utf-8").strip()
 
 
 def logs(args, name, ignore_stderr=False):
@@ -357,7 +358,7 @@ def logs(args, name, ignore_stderr=False):
         raise ValueError("no container manager (Podman, Docker) found")
 
     conman_args = [conman, "logs", name]
-    return run_cmd(conman_args, ignore_stderr=ignore_stderr).stdout.decode("utf-8").strip()
+    return run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=ignore_stderr).stdout.decode("utf-8").strip()
 
 
 def stop_container(args, name, remove=False):
@@ -391,7 +392,7 @@ def stop_container(args, name, remove=False):
 
         conman_args += [name]
     try:
-        run_cmd(conman_args, ignore_stderr=ignore_stderr)
+        run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=ignore_stderr)
     except subprocess.CalledProcessError:
         if args.ignore and conman == "docker":
             return
@@ -408,7 +409,7 @@ def stop_container(args, name, remove=False):
                 ignore_stderr = True
         conman_args += [name]
         try:
-            run_cmd(conman_args, ignore_stderr=ignore_stderr)
+            run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=ignore_stderr)
         except subprocess.CalledProcessError:
             if args.ignore and conman == "docker":
                 return

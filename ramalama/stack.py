@@ -4,7 +4,7 @@ import tempfile
 import ramalama.kube as kube
 import ramalama.quadlet as quadlet
 from ramalama.common import check_nvidia, exec_cmd, genname, get_accel_env_vars, tagged_image
-from ramalama.config import CONFIG
+from ramalama.config import CONFIG, get_cli_with_prefix
 from ramalama.engine import add_labels
 from ramalama.transports.base import compute_serving_port
 from ramalama.transports.transport_factory import New
@@ -224,7 +224,7 @@ spec:
             exec_args.append("--wait")
 
         exec_args.append(yaml_file.name)
-        exec_cmd(exec_args)
+        exec_cmd(get_cli_with_prefix(exec_args))
 
     def stop(self):
         yaml_file = tempfile.NamedTemporaryFile(prefix='RamaLama_', delete=not self.args.debug)
@@ -239,4 +239,4 @@ spec:
             yaml_file.name,
         ]
 
-        exec_cmd(exec_args)
+        exec_cmd(get_cli_with_prefix(exec_args))

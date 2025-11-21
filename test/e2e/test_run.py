@@ -267,7 +267,7 @@ def test_run_model_with_prompt(shared_ctx_with_models, test_model):
 
     ctx = shared_ctx_with_models
 
-    run_cmd = ["ramalama", "run", "--temp", "0"]
+    run_cmd = ["ramalama", "--debug", "run", "--temp", "0"]
     if platform.system() == "Darwin":
         # Reduce context size and limit output for faster macOS testing
         run_cmd.extend(["-c", "512", "--runtime-args='-n 15'"])
@@ -306,7 +306,7 @@ def test_run_keepalive(shared_ctx_with_models, test_model):
                 "tiny",
             ],
             22,
-            r".*Error: quay.io/ramalama/testrag: image not known",
+            r".*quay.io/ramalama/testrag: image not known",
             id="non-existing-image-with-rag",
         ),
     ],

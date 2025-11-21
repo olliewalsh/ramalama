@@ -734,7 +734,7 @@ def test_serve_with_non_existing_images():
                 stderr=STDOUT,
             )
         assert exc_info.value.returncode == 22
-        assert re.search(r"Error: quay.io/ramalama/rag: image not known.*", exc_info.value.output.decode("utf-8"))
+        assert re.search(r"quay.io/ramalama/rag: image not known.*", exc_info.value.output.decode("utf-8"))
 
 
 @pytest.mark.e2e

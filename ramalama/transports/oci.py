@@ -10,6 +10,7 @@ from ramalama.common import exec_cmd, perror, run_cmd, set_accel_env_vars
 from ramalama.engine import BuildEngine, Engine, dry_run
 from ramalama.oci_tools import engine_supports_manifest_attributes
 from ramalama.transports.base import Transport
+from ramalama.config import get_cli_with_prefix
 
 prefix = "oci://"
 
@@ -43,12 +44,12 @@ class OCI(Transport):
             conman_args.append("--password-stdin")
         if args.REGISTRY:
             conman_args.append(args.REGISTRY.removeprefix(prefix))
-        return exec_cmd(conman_args)
+        return exec_cmd(get_cli_with_prefix(conman_args))
 
     def logout(self, args):
         conman_args = [self.conman, "logout"]
         conman_args.append(self.model)
-        return exec_cmd(conman_args)
+        return exec_cmd(get_cli_with_prefix(conman_args))
 
     def _convert_to_gguf(self, outdir, source_model, args):
         with tempfile.TemporaryDirectory(prefix="RamaLama_convert_src_") as srcdir:
@@ -162,7 +163,7 @@ class OCI(Transport):
         if args.dryrun:
             dry_run(cmd_args)
         else:
-            run_cmd(cmd_args)
+            run_cmd(get_cli_with_prefix(cmd_args))
 
     def _create_manifest_without_attributes(self, target, imageid, args):
         # Create manifest list for target with imageid
@@ -176,7 +177,7 @@ class OCI(Transport):
         if args.dryrun:
             dry_run(cmd_args)
         else:
-            run_cmd(cmd_args)
+            run_cmd(get_cli_with_prefix(cmd_args))
 
     def _create_manifest(self, target, imageid, args):
         if not engine_supports_manifest_attributes(args.engine):
@@ -193,7 +194,7 @@ class OCI(Transport):
         if args.dryrun:
             dry_run(cmd_args)
         else:
-            run_cmd(cmd_args)
+            run_cmd(get_cli_with_prefix(cmd_args))
 
         # Annotate manifest list
         cmd_args = [
@@ -212,7 +213,7 @@ class OCI(Transport):
         if args.dryrun:
             dry_run(cmd_args)
         else:
-            run_cmd(cmd_args, stdout=None)
+            run_cmd(get_cli_with_prefix(cmd_args), stdout=None)
 
     def _convert(self, source_model, args):
         set_accel_env_vars()
@@ -225,7 +226,7 @@ class OCI(Transport):
             if args.dryrun:
                 dry_run(rm_cmd)
             else:
-                run_cmd(rm_cmd, ignore_stderr=True, stdout=None)
+                run_cmd(get_cli_with_prefix(rm_cmd), ignore_stderr=True, stdout=None)
         except subprocess.CalledProcessError:
             pass
         perror(f"Building {self.model} ...")
@@ -260,7 +261,7 @@ Tagging build instead
         if source != target:
             self._convert(source_model, args)
         try:
-            run_cmd(conman_args)
+            run_cmd(get_cli_with_prefix(conman_args))
         except subprocess.CalledProcessError as e:
             perror(f"Failed to push OCI {target} : {e}")
             raise e
@@ -280,7 +281,7 @@ Tagging build instead
         if args.authfile:
             conman_args.extend([f"--authfile={args.authfile}"])
         conman_args.extend([self.model])
-        run_cmd(conman_args, ignore_stderr=self.ignore_stderr)
+        run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=self.ignore_stderr)
 
     def remove(self, args, ignore_stderr=False):
         if self.conman is None:
@@ -288,10 +289,10 @@ Tagging build instead
 
         try:
             conman_args = [self.conman, "manifest", "rm", self.model]
-            run_cmd(conman_args, ignore_stderr=self.ignore_stderr)
+            run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=self.ignore_stderr)
         except subprocess.CalledProcessError:
             conman_args = [self.conman, "rmi", f"--force={args.ignore}", self.model]
-            run_cmd(conman_args, ignore_stderr=self.ignore_stderr)
+            run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=self.ignore_stderr)
 
     def exists(self) -> bool:
         if self.conman is None:
@@ -299,7 +300,7 @@ Tagging build instead
 
         conman_args = [self.conman, "image", "inspect", self.model]
         try:
-            run_cmd(conman_args, ignore_stderr=self.ignore_stderr)
+            run_cmd(get_cli_with_prefix(conman_args), ignore_stderr=self.ignore_stderr)
             return True
         except Exception:
             return False

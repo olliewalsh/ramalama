@@ -4,6 +4,7 @@ from datetime import datetime
 import ramalama.annotations as annotations
 from ramalama.arg_types import EngineArgType
 from ramalama.common import engine_version, run_cmd
+from ramalama.config import get_cli_with_prefix
 
 ocilabeltype = "org.containers.type"
 
@@ -31,7 +32,7 @@ def list_manifests(args: EngineArgType):
             '"size":{{ .VirtualSize }}, "ID":"{{ .ID }}"},'
         ),
     ]
-    output = run_cmd(conman_args).stdout.decode("utf-8").strip()
+    output = run_cmd(get_cli_with_prefix(conman_args)).stdout.decode("utf-8").strip()
     if output == "":
         return []
 
@@ -47,7 +48,7 @@ def list_manifests(args: EngineArgType):
             "inspect",
             manifest["ID"],
         ]
-        output = run_cmd(conman_args).stdout.decode("utf-8").strip()
+        output = run_cmd(get_cli_with_prefix(conman_args)).stdout.decode("utf-8").strip()
 
         if output == "":
             continue
@@ -91,7 +92,7 @@ def list_models(args: EngineArgType):
         "--format",
         formatLine,
     ]
-    output = run_cmd(conman_args, env={"TZ": "UTC"}).stdout.decode("utf-8").strip()
+    output = run_cmd(get_cli_with_prefix(conman_args), env={"TZ": "UTC"}).stdout.decode("utf-8").strip()
     if output == "":
         return []
 
