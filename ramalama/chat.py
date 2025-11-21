@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import _thread
 import cmd
 import copy
 import itertools
@@ -24,6 +25,10 @@ from ramalama.file_loaders.file_manager import OpanAIChatAPIMessageBuilder
 from ramalama.logger import logger
 from ramalama.mcp.mcp_agent import LLMAgent
 from ramalama.mcp.mcp_client import PureMCPClient
+from ramalama.proxy_support import setup_proxy_support
+
+# Setup proxy support on module import
+setup_proxy_support()
 
 
 def res(response, color):
@@ -95,7 +100,7 @@ class ChatOperationalArgs:
     pid2kill: int | None = None
     name: str | None = None
     keepalive: int | None = None
-    server_exited_event: "threading.Event | None" = None
+    monitor: "ServerMonitor | None" = None
 
 
 class RamaLamaShell(cmd.Cmd):
@@ -115,6 +120,7 @@ class RamaLamaShell(cmd.Cmd):
         self.initialize_mcp()
 
         self.content: list[str] = []
+        self.message_count = 0  # Track messages for summarization
 
     def prep_rag_message(self):
         if (context := self.args.rag) is None:
@@ -123,6 +129,104 @@ class RamaLamaShell(cmd.Cmd):
         builder = OpanAIChatAPIMessageBuilder()
         messages = builder.load(context)
         self.conversation_history.extend(messages)
+
+    def _summarize_conversation(self):
+        """Summarize the conversation history to prevent context growth."""
+        if len(self.conversation_history) < 4:
+            # Need at least a few messages to summarize
+            return
+
+        # Keep the first message (system/RAG context) and last 2 messages
+        # Summarize everything in between
+        first_msg = self.conversation_history[0]
+        messages_to_summarize = self.conversation_history[1:-2]
+        recent_msgs = self.conversation_history[-2:]
+
+        if not messages_to_summarize:
+            return
+
+        # Create a summarization prompt
+        conversation_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in messages_to_summarize])
+
+        summary_prompt = {
+            "role": "user",
+            "content": (
+                f"Please provide a concise summary of the following conversation, "
+                f"preserving key information and context:\n\n{conversation_text}\n\n"
+                f"Provide only the summary, without any preamble."
+            ),
+        }
+
+        # Make API call to get summary
+        # Provide user feedback during summarization
+        print("\nSummarizing conversation to reduce context size...", flush=True)
+        try:
+            req = self._make_api_request([summary_prompt], stream=False)
+
+            with urllib.request.urlopen(req) as response:
+                result = json.loads(response.read())
+                summary = result['choices'][0]['message']['content']
+
+                # Rebuild conversation history with summary
+                new_history = []
+                if first_msg:
+                    new_history.append(first_msg)
+
+                # Add summary as a system message
+                new_history.append({"role": "system", "content": f"Previous conversation summary: {summary}"})
+
+                # Add recent messages
+                new_history.extend(recent_msgs)
+
+                self.conversation_history = new_history
+                logger.debug(f"Summarized conversation: {len(messages_to_summarize)} messages -> 1 summary")
+
+        except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
+            logger.warning(f"Failed to summarize conversation: {e}")
+            # On failure, just keep the conversation as-is
+        finally:
+            # Clear the "Summarizing..." message
+            print("\r" + " " * 60 + "\r", end="", flush=True)
+
+    def _check_and_summarize(self):
+        """Check if conversation needs summarization and trigger it."""
+        summarize_after = getattr(self.args, "summarize_after", 0)
+        if summarize_after > 0:
+            self.message_count += 2  # user + assistant messages
+            if self.message_count >= summarize_after:
+                self._summarize_conversation()
+                self.message_count = 0  # Reset counter after summarization
+
+    def _make_api_request(self, messages, stream=True):
+        """Make an API request with the given messages.
+
+        Args:
+            messages: List of message dicts to send
+            stream: Whether to stream the response
+
+        Returns:
+            urllib.request.Request object
+        """
+        data = {
+            "stream": stream,
+            "messages": messages,
+        }
+        if getattr(self.args, "model", None):
+            data["model"] = self.args.model
+        if getattr(self.args, "temp", None):
+            data["temperature"] = float(self.args.temp)
+        if stream and getattr(self.args, "max_tokens", None):
+            data["max_completion_tokens"] = self.args.max_tokens
+
+        headers = add_api_key(self.args)
+        headers["Content-Type"] = "application/json"
+
+        return urllib.request.Request(
+            self.url,
+            data=json.dumps(data).encode('utf-8'),
+            headers=headers,
+            method="POST",
+        )
 
     def initialize_mcp(self):
         """Initialize MCP servers if specified."""
@@ -248,7 +352,7 @@ class RamaLamaShell(cmd.Cmd):
             perror("\nCancelled.")
             return None
 
-    def handle_args(self, monitor_thread):
+    def handle_args(self, monitor):
         prompt = " ".join(self.args.ARGS) if self.args.ARGS else None
         if not sys.stdin.isatty():
             stdin = sys.stdin.read()
@@ -259,8 +363,7 @@ class RamaLamaShell(cmd.Cmd):
 
         if prompt:
             self.default(prompt)
-            if monitor_thread:
-                _stop_server_monitor(monitor_thread)
+            monitor.stop()
             self.kills()
             return True
 
@@ -295,6 +398,7 @@ class RamaLamaShell(cmd.Cmd):
                     print(response)
                 self.conversation_history.append({"role": "user", "content": content})
                 self.conversation_history.append({"role": "assistant", "content": response})
+                self._check_and_summarize()
             return False
 
         self.conversation_history.append({"role": "user", "content": content})
@@ -303,6 +407,7 @@ class RamaLamaShell(cmd.Cmd):
         if response:
             self.conversation_history.append({"role": "assistant", "content": response})
         self.request_in_process = False
+        self._check_and_summarize()
 
     def _make_request_data(self):
         data = {
@@ -412,7 +517,7 @@ class RamaLamaShell(cmd.Cmd):
                 self.cmdloop()
             except KeyboardInterrupt:
                 # Distinguish between user interrupt and server/container exit
-                if self.operational_args.server_exited_event and self.operational_args.server_exited_event.is_set():
+                if self.operational_args.monitor and self.operational_args.monitor.is_exited():
                     # Server/container exited, exit with clear message
                     perror("\nServer or container exited. Shutting down client.")
                     raise
@@ -438,81 +543,132 @@ def alarm_handler(signum, frame):
     raise TimeoutException()
 
 
-def _start_server_monitor(server_pid):
-    """Start a background thread to monitor the server process."""
+class ServerMonitor:
+    """Monitor server process or container and report when it exits."""
 
-    # Use a global variable to track monitor status
-    global _server_monitor_active
-    if getattr(_start_server_monitor, "_active", False):
-        # Monitor already running, do not start another
-        return None, None, None
-    _start_server_monitor._active = True
+    def __init__(
+        self,
+        server_pid=None,
+        container_name=None,
+        container_engine=None,
+        join_timeout=3.0,
+        check_interval=0.5,
+    ):
+        """
+        Initialize the server monitor.
 
-    # Event to signal the monitor thread to stop
-    stop_monitor = threading.Event()
-    # Event to signal that server has exited
-    server_exited = threading.Event()
-    exit_info = {}
+        Args:
+            server_pid: Process ID to monitor (for direct process monitoring)
+            container_name: Container name to monitor (for container monitoring)
+            container_engine: Container engine command (podman/docker)
+            join_timeout: Seconds for thread join when stopping (default: 3.0)
+            check_interval: Seconds between monitoring checks (default: 0.5)
 
-    def monitor_server_process():
+        Note: If neither server_pid nor container_name is provided, the monitor
+        operates in no-op mode (no actual monitoring occurs).
+        """
+        self.server_pid = server_pid
+        self.container_name = container_name
+        self.container_engine = container_engine
+        self.timeout = join_timeout
+        self.check_interval = check_interval
+
+        self._stop_event = threading.Event()
+        self._exited_event = threading.Event()
+        self._exit_info = {}
+        self._monitor_thread = None
+
+        # Determine monitoring mode
+        if server_pid:
+            if sys.platform == "win32":
+                # os.waitpid() is not available for non-child processes on Windows.
+                raise NotImplementedError("Process monitoring by PID is not supported on Windows.")
+            self._mode = "process"
+        elif container_name and container_engine:
+            self._mode = "container"
+        else:
+            # No monitoring needed - chat is being used without a service
+            self._mode = "none"
+
+    def start(self):
+        """Start the monitoring thread."""
+        # No-op if not monitoring anything
+        if self._mode == "none":
+            return
+
+        if self._monitor_thread and self._monitor_thread.is_alive():
+            logger.warning("Monitor thread already running")
+            return
+
+        if self._mode == "process":
+            target = self._monitor_process
+        else:
+            target = self._monitor_container
+
+        self._monitor_thread = threading.Thread(target=target, daemon=True)
+        self._monitor_thread.start()
+
+    def stop(self):
+        """Stop the monitoring thread."""
+        if self._monitor_thread and self._monitor_thread.is_alive():
+            self._stop_event.set()
+            self._monitor_thread.join(timeout=self.timeout)
+
+    def is_exited(self):
+        """Check if the monitored server/container has exited."""
+        return self._exited_event.is_set()
+
+    def is_stopping(self):
+        """Check if the monitor is in the process of stopping."""
+        return self._stop_event.is_set()
+
+    def get_exit_info(self):
+        """Get information about the exit."""
+        return self._exit_info.copy()
+
+    def _monitor_process(self):
         """Monitor the server process and report if it exits."""
-        while not stop_monitor.is_set():
+        while not self._stop_event.is_set():
             try:
                 # Use waitpid with WNOHANG to check without blocking
-                pid, status = os.waitpid(server_pid, os.WNOHANG)
+                pid, status = os.waitpid(self.server_pid, os.WNOHANG)
                 if pid != 0:
                     # Process has exited
-                    exit_info["pid"] = server_pid
-                    exit_info["status"] = status
+                    self._exit_info["pid"] = self.server_pid
+                    self._exit_info["status"] = status
                     if os.WIFEXITED(status):
-                        exit_info["type"] = "exit"
-                        exit_info["code"] = os.WEXITSTATUS(status)
+                        self._exit_info["type"] = "exit"
+                        self._exit_info["code"] = os.WEXITSTATUS(status)
                     elif os.WIFSIGNALED(status):
-                        exit_info["type"] = "signal"
-                        exit_info["signal"] = os.WTERMSIG(status)
+                        self._exit_info["type"] = "signal"
+                        self._exit_info["signal"] = os.WTERMSIG(status)
                     else:
-                        exit_info["type"] = "unknown"
-                    server_exited.set()
+                        self._exit_info["type"] = "unknown"
+                    self._exited_event.set()
                     # Send SIGINT to main process to interrupt the chat
-                    os.kill(os.getpid(), signal.SIGINT)
+                    _thread.interrupt_main()
                     break
             except ChildProcessError:
                 # Process doesn't exist or already reaped
-                exit_info["pid"] = server_pid
-                exit_info["type"] = "missing"
-                server_exited.set()
-                os.kill(os.getpid(), signal.SIGINT)
+                self._exit_info["pid"] = self.server_pid
+                self._exit_info["type"] = "missing"
+                self._exited_event.set()
+                _thread.interrupt_main()
                 break
-            time.sleep(0.5)
-        # Reset monitor status when thread exits
-        _start_server_monitor._active = False
+            # Use wait() instead of sleep() for responsive shutdown
+            self._stop_event.wait(self.check_interval)
 
-    monitor_thread = threading.Thread(target=monitor_server_process, daemon=True)
-    monitor_thread.start()
-    monitor_thread.stop_event = stop_monitor
-    return monitor_thread, server_exited, exit_info
-
-
-def _start_container_monitor(container_name, conman):
-    """Start a background thread to monitor the container."""
-
-    # Event to signal the monitor thread to stop
-    stop_monitor = threading.Event()
-    # Event to signal that container has exited
-    container_exited = threading.Event()
-    exit_info = {}
-
-    def monitor_container():
+    def _monitor_container(self):
         """Monitor the container and report if it exits."""
-        while not stop_monitor.is_set():
+        while not self._stop_event.is_set():
             try:
                 # Check if container is still running and get its state and exit code in one go
                 inspect_format = "{{.State.Status}}\n{{.State.ExitCode}}"
                 result = subprocess.run(
-                    [conman, "inspect", "--format", inspect_format, container_name],
+                    [self.container_engine, "inspect", "--format", inspect_format, self.container_name],
                     capture_output=True,
                     text=True,
-                    timeout=5,
+                    timeout=self.check_interval,
                 )
                 output_lines = result.stdout.strip().split('\n')
                 status = output_lines[0] if output_lines else ""
@@ -521,52 +677,38 @@ def _start_container_monitor(container_name, conman):
                 # Explicitly check for non-running states
                 if status in ["exited", "dead", "removing"] or (status == "" and exit_code_str != ""):
                     # Container has exited
-                    exit_info["name"] = container_name
-                    exit_info["type"] = "container"
+                    self._exit_info["name"] = self.container_name
+                    self._exit_info["type"] = "container"
                     # Default to 'exited' if status is empty but exit code exists
-                    exit_info["status"] = status if status else "exited"
+                    self._exit_info["status"] = status if status else "exited"
 
                     try:
-                        exit_info["code"] = int(exit_code_str)
+                        self._exit_info["code"] = int(exit_code_str)
                     except (ValueError, AttributeError):
-                        exit_info["code"] = "unknown"
+                        self._exit_info["code"] = "unknown"
 
-                    container_exited.set()
+                    self._exited_event.set()
                     # Send SIGINT to main process to interrupt the chat
-                    os.kill(os.getpid(), signal.SIGINT)
+                    _thread.interrupt_main()
                     break
             except subprocess.TimeoutExpired:
-                logger.debug(f"Timeout checking container {container_name} status")
+                logger.debug(f"Timeout checking container {self.container_name} status")
             except subprocess.CalledProcessError:
                 # Container not found or error checking status
-                exit_info["name"] = container_name
-                exit_info["type"] = "container_missing"
-                container_exited.set()
-                os.kill(os.getpid(), signal.SIGINT)
+                self._exit_info["name"] = self.container_name
+                self._exit_info["type"] = "container_missing"
+                self._exited_event.set()
+                _thread.interrupt_main()
                 break
             except Exception as e:
                 logger.debug(f"Error checking container status: {e}")
-            time.sleep(0.5)  # Check every 500ms
-
-    # Start the monitoring thread
-    monitor_thread = threading.Thread(target=monitor_container, daemon=True)
-    monitor_thread.start()
-
-    # Store stop_monitor in the thread object so we can access it later
-    monitor_thread.stop_event = stop_monitor
-
-    return monitor_thread, container_exited, exit_info
+            # Use wait() instead of sleep() for responsive shutdown
+            self._stop_event.wait(self.check_interval)
 
 
-def _stop_server_monitor(monitor_thread):
-    """Stop the server monitoring thread."""
-    if hasattr(monitor_thread, "stop_event"):
-        monitor_thread.stop_event.set()
-        monitor_thread.join(timeout=1.0)
-
-
-def _report_server_exit(exit_info):
+def _report_server_exit(monitor):
     """Report details about server exit."""
+    exit_info = monitor.get_exit_info()
     exit_type = exit_info.get("type", "unknown")
 
     if exit_type == "container":
@@ -575,7 +717,7 @@ def _report_server_exit(exit_info):
         status = exit_info.get("status", "unknown")
         perror(f"Container '{container_name}' exited unexpectedly with exit code {exit_code} (status: {status})")
         perror("\nThe chat session has been terminated because the container is no longer running.")
-        perror(f"Check container logs with: podman logs {container_name}")
+        perror(f"Check container logs with: {monitor.container_engine} logs {container_name}")
     elif exit_type == "container_missing":
         container_name = exit_info.get("name", "unknown")
         perror(f"Container '{container_name}' not found - may have been removed")
@@ -611,22 +753,24 @@ def chat(args: ChatArgsType, operational_args: ChatOperationalArgs | None = None
         signal.alarm(convert_to_seconds(args.keepalive))  # type: ignore
 
     # Start server process or container monitoring
-    monitor_thread = None
-    server_exited_event = None
-    exit_info = {}
-
     # Check if we should monitor a process (pid2kill) or container (name)
     pid2kill = getattr(args, "pid2kill", None)
     container_name = getattr(args, "name", None)
 
     if pid2kill:
         # Monitor the server process
-        monitor_thread, server_exited_event, exit_info = _start_server_monitor(pid2kill)
+        monitor = ServerMonitor(server_pid=pid2kill)
     elif container_name:
         # Monitor the container
         conman = getattr(args, "engine", CONFIG.engine)
-        if conman:
-            monitor_thread, server_exited_event, exit_info = _start_container_monitor(container_name, conman)
+        if not conman:
+            raise ValueError("Container engine is required when monitoring a container")
+        monitor = ServerMonitor(container_name=container_name, container_engine=conman)
+    else:
+        # No monitoring needed - chat is being used directly without a service
+        monitor = ServerMonitor()
+
+    monitor.start()
     list_models = getattr(args, "list", False)
     if list_models:
         url = f"{args.url}/models"
@@ -642,28 +786,32 @@ def chat(args: ChatArgsType, operational_args: ChatOperationalArgs | None = None
     if operational_args is None:
         operational_args = ChatOperationalArgs()
 
-    # Assign server_exited_event to operational_args immediately after thread/event creation
-    if server_exited_event:
-        operational_args.server_exited_event = server_exited_event
+    # Assign monitor to operational_args
+    operational_args.monitor = monitor
 
+    successful_exit = True
     try:
         shell = RamaLamaShell(args, operational_args)
-        if shell.handle_args(monitor_thread):
+        if shell.handle_args(monitor):
             return
 
         if not list_models:
             shell.loop()
     except KeyboardInterrupt:
         # If monitor was already shut down exit cleanly
-        if monitor_thread and monitor_thread.stop_event.is_set():
+        if monitor.is_stopping():
             return
         # Check if this was caused by server exit
-        if server_exited_event and server_exited_event.is_set():
-            # Server/container exited unexpectedly
+        if monitor.is_exited():
+            successful_exit = False  # Server/container exited unexpectedly
             perror("\n" + "=" * 60)
-            _report_server_exit(exit_info)
+            _report_server_exit(monitor)
             perror("=" * 60)
-            raise SystemExit(exit_info['code'])
+            exit_info = monitor.get_exit_info()
+            exit_code = exit_info.get('code', 1)
+            if exit_info.get('type') == 'signal' and isinstance(exit_info.get('signal'), int):
+                exit_code = 128 + exit_info.get('signal')
+            raise SystemExit(exit_code)
         raise
     except TimeoutException as e:
         logger.debug(f"Timeout Exception: {e}")
@@ -671,16 +819,19 @@ def chat(args: ChatArgsType, operational_args: ChatOperationalArgs | None = None
         perror("")
         pass
     finally:
-        # Stop the monitoring thread if it was started
-        if monitor_thread:
-            _stop_server_monitor(monitor_thread)
+        # Stop the monitoring thread
+        monitor.stop()
         # Reset the alarm to 0 to cancel any pending alarms (Unix only)
         if hasattr(signal, 'alarm'):
             signal.alarm(0)
-    try:
-        shell.kills()
-    except Exception as e:
-        logger.warning(f"Failed to clean up resources: {e}")
+
+    # Only clean up resources on successful exit
+    # If server/container crashed, leave it for log inspection
+    if successful_exit:
+        try:
+            shell.kills()
+        except Exception as e:
+            logger.warning(f"Failed to clean up resources: {e}")
 
 
 UNITS = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks"}
