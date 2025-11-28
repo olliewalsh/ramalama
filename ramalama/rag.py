@@ -105,8 +105,8 @@ class Rag:
                 ragdb.cleanup()
 
 
-def rag_image(config: Config) -> str:
-    return accel_image(config, images=config.rag_images, conf_key="rag_image")
+def rag_image(config: Config, should_pull: bool | None = None) -> str:
+    return accel_image(config, images=config.rag_images, conf_key="rag_image", should_pull=should_pull)
 
 
 class RagSource(StrEnum):

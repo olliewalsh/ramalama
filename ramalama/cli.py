@@ -594,13 +594,13 @@ def info_cli(args):
         "Engine": {
             "Name": args.engine,
         },
-        "Image": accel_image(CONFIG),
+        "Image": accel_image(CONFIG, should_pull=False),
         "Inference": {
             "Default": args.runtime,
             "Engines": {spec: str(path) for spec, path in get_inference_spec_files().items()},
             "Schema": {schema: str(path) for schema, path in get_inference_schema_files().items()},
         },
-        "RagImage": rag_image(CONFIG),
+        "RagImage": rag_image(CONFIG, should_pull=False),
         "Selinux": CONFIG.selinux,
         "Shortnames": {
             "Files": shortnames.paths,
@@ -708,14 +708,14 @@ def convert_parser(subparsers):
     add_network_argument(parser)
     parser.add_argument(
         "--rag-image",
-        default=rag_image(CONFIG),
+        default=rag_image(CONFIG, should_pull=False),
         help="Image to use for conversion to GGUF",
         action=OverrideDefaultAction,
         completer=local_images,
     )
     parser.add_argument(
         "--image",
-        default=accel_image(CONFIG),
+        default=accel_image(CONFIG, should_pull=False),
         help="Image to use for quantization",
         action=OverrideDefaultAction,
         completer=local_images,
@@ -900,7 +900,7 @@ def runtime_options(parser, command):
         )
     parser.add_argument(
         "--image",
-        default=accel_image(CONFIG),
+        default=accel_image(CONFIG, should_pull=False),
         help="OCI container image to run with the specified AI model",
         action=OverrideDefaultAction,
         completer=local_images,
@@ -982,7 +982,7 @@ If GPU device on host is accessible to via group access, this option leaks the u
         )
         parser.add_argument(
             "--rag-image",
-            default=rag_image(CONFIG),
+            default=rag_image(CONFIG, should_pull=False),
             help="OCI container image to run with the specified RAG data",
             action=OverrideDefaultAction,
             completer=local_images,
@@ -1233,7 +1233,7 @@ def daemon_parser(subparsers) -> None:
     start_parser = daemon_parsers.add_parser("start")
     start_parser.add_argument(
         "--image",
-        default=accel_image(CONFIG),
+        default=accel_image(CONFIG, should_pull=False),
         help="OCI container image to run with the specified AI model",
         action=OverrideDefaultAction,
         completer=local_images,
@@ -1363,7 +1363,7 @@ def rag_parser(subparsers):
     )
     parser.add_argument(
         "--image",
-        default=rag_image(CONFIG),
+        default=rag_image(CONFIG, should_pull=False),
         help="Image to use for generating RAG data",
         action=OverrideDefaultAction,
         completer=local_images,

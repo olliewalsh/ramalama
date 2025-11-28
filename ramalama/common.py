@@ -671,7 +671,9 @@ AccelImageArgs: TypeAlias = (
 )
 
 
-def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_key: str = "image") -> str:
+def accel_image(
+    config: Config, images: RamalamaImageConfig | None = None, conf_key: str = "image", should_pull: bool | None = None
+) -> str:
     """
     Selects and the appropriate image based on config, arguments, environment.
     "images" is a mapping of environment variable names to image names. If not specified, the
@@ -717,7 +719,9 @@ def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_
 
     vers = minor_release()
 
-    should_pull = config.pull != "never" and not config.dryrun
+    if should_pull is None:
+        should_pull = config.pull != "never" and not config.dryrun
+
     if config.engine and attempt_to_use_versioned(config.engine, image, vers, config.quiet, should_pull):
         return f"{image}:{vers}"
 
@@ -727,14 +731,11 @@ def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_
 def attempt_to_use_versioned(conman: str, image: str, vers: str, quiet: bool, should_pull: bool) -> bool:
     try:
         # check if versioned image exists locally
-        if run_cmd([conman, "inspect", f"{image}:{vers}"], ignore_all=True):
+        if not should_pull or run_cmd([conman, "inspect", f"{image}:{vers}"], ignore_all=True):
             return True
 
     except Exception:
         pass
-
-    if not should_pull:
-        return False
 
     try:
         # attempt to pull the versioned image
