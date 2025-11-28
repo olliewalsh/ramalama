@@ -14,7 +14,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable
-from functools import lru_cache
+from functools import cache
 from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, TypedDict, cast, get_args
 
 import yaml
@@ -374,7 +374,7 @@ def check_metal(args: ContainerArgType) -> bool:
     return platform.system() == "Darwin"
 
 
-@lru_cache(maxsize=1)
+@cache
 def check_nvidia() -> Literal["cuda"] | None:
     try:
         command = ['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader']
@@ -717,8 +717,8 @@ def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_
 
     vers = minor_release()
 
-    should_pull = config.pull in ["always", "missing"] and not config.dryrun
-    if config.engine and attempt_to_use_versioned(config.engine, image, vers, True, should_pull):
+    should_pull = config.pull != "never" and not config.dryrun
+    if config.engine and attempt_to_use_versioned(config.engine, image, vers, config.quiet, should_pull):
         return f"{image}:{vers}"
 
     return f"{image}:latest"
@@ -740,7 +740,7 @@ def attempt_to_use_versioned(conman: str, image: str, vers: str, quiet: bool, sh
         # attempt to pull the versioned image
         if not quiet:
             perror(f"Attempting to pull {image}:{vers} ...")
-        run_cmd([conman, "pull", f"{image}:{vers}"], ignore_stderr=True)
+        run_cmd([conman, "pull", f"{image}:{vers}"], stdout=subprocess.DEVNULL if quiet else None, ignore_stderr=quiet)
         return True
 
     except Exception:

@@ -238,6 +238,7 @@ class BaseConfig:
     port: str = "8080"
     prefix: str = None  # type: ignore
     pull: str = "newer"
+    quiet: bool = False
     rag_format: Literal["qdrant", "json", "markdown", "milvus"] = "qdrant"
     runtime: SUPPORTED_RUNTIMES = "llama.cpp"
     selinux: bool = False

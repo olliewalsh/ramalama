@@ -168,6 +168,10 @@ If this port is unavailable, another free port from this range will be selected.
 - **never**: Never pull the image but use the one from the local containers storage. Throw an error when no image is found.
 - **newer**: Pull if the image on the registry is newer than the one in the local containers storage. An image is considered to be newer when the digests are different. Comparing the time stamps is prone to errors. Pull errors are suppressed if a local image was found.
 
+**quiet**=false
+
+Reduce output to the minimum necessary.
+
 **rag_format**="qdrant"
 
 OCI container image to run with the specified AI model when using RAG content.
