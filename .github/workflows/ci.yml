@@ -475,13 +475,20 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Update WSL2
+        shell: pwsh
+        run: |
+          Write-Host "Updating WSL2..."
+          wsl --update
+          wsl --shutdown
+
       - name: Install Podman
         shell: pwsh
         run: |
           Write-Host "Installing Podman on Windows..."
 
           # Download and install Podman
-          $podmanVersion = "5.3.1"
+          $podmanVersion = "5.7.0"
           $installerUrl = "https://github.com/containers/podman/releases/download/v$podmanVersion/podman-$podmanVersion-setup.exe"
           $installerPath = "$env:TEMP\podman-setup.exe"
 
@@ -492,9 +499,12 @@ jobs:
           Start-Process -FilePath $installerPath -ArgumentList "/install", "/quiet", "/norestart" -Wait -NoNewWindow
 
           # Add Podman to PATH for current session
-          $podmanPath = "C:\Program Files\RedHat\Podman"
+          $podmanPath = "$env:ProgramFiles" + "\RedHat\Podman"
           $env:PATH = "$podmanPath;$env:PATH"
           [Environment]::SetEnvironmentVariable("PATH", $env:PATH, [EnvironmentVariableTarget]::Process)
+
+          # Update PATH for future steps
+          Add-Content -Path $env:GITHUB_PATH -Value "$podmanPath"
 
           Write-Host "Verifying Podman installation..."
           podman --version
