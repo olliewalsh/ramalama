@@ -1,8 +1,10 @@
 import os
+import platform
 import sys
 import random
 import socket
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
@@ -388,8 +390,6 @@ class Transport(TransportBase):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
 
-        args.noout = not args.debug
-
         process = self._fork_and_serve(args, server_cmd)
         if process:
             return self._connect_and_chat(args, process)
@@ -403,6 +403,12 @@ class Transport(TransportBase):
         args.host = CONFIG.host
         args.generate = ""
         args.detach = True
+
+        set_accel_env_vars()
+
+        if args.generate:
+            self.generate_container_config(args, cmd)
+            return
         
         if args.container:
             # For container mode, set up the container and start it with subprocess
@@ -412,26 +418,18 @@ class Transport(TransportBase):
             self.engine.add([args.image] + cmd)
 
             if args.dryrun:
-                dry_run(self.engine.exec_args)
+                self.engine.dryrun()
                 return
             
             # Start the container using subprocess.Popen
-            stdout_target = subprocess.DEVNULL if args.noout else None
-            stderr_target = subprocess.DEVNULL if args.noout else None
             process = subprocess.Popen(
                 self.engine.exec_args,
-                stdout=stdout_target,
-                stderr=stderr_target,
             )
             return process
         else:
             # Non-container mode: run the command directly with subprocess
-            stdout_target = subprocess.DEVNULL if args.noout else None
-            stderr_target = subprocess.DEVNULL if args.noout else None
             process = subprocess.Popen(
                 cmd,
-                stdout=stdout_target,
-                stderr=stderr_target,
             )
             return process
 
@@ -447,15 +445,13 @@ class Transport(TransportBase):
         args.url = f"http://127.0.0.1:{args.port}/v1"
         if getattr(args, "runtime", None) == "mlx":
             args.prefix = "🍏 > "
-        args.pid2kill = ""
         
         # Store the Popen object for monitoring
-        #args.server_process = server_process
+        args.server_process = server_process
 
         if args.container:
             return self._handle_container_chat(args, server_process)
         else:
-            args.pid2kill = server_process.pid
             if getattr(args, "runtime", None) == "mlx":
                 return self._handle_mlx_chat(args)
             chat.chat(args)
