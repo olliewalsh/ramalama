@@ -446,7 +446,6 @@ def test_generation_with_bad_add_to_unit_flag_value(test_model):
 
 
 @pytest.mark.e2e
-@xfail_if_windows  # FIXME: registry fixture currently doesn't work on windows
 @skip_if_no_container
 @pytest.mark.xfail("config.option.container_engine == 'docker'", reason="docker login does not support --tls-verify")
 def test_quadlet_and_kube_generation_with_container_registry(container_registry, is_container, test_model):

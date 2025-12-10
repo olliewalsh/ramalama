@@ -57,6 +57,7 @@ text = "MIT"
 dev = [
     # "pytest>=7.0",
     "argcomplete~=3.0",
+    "bcrypt",
     "black~=25.0",
     "codespell~=2.0",
     "flake8~=7.0",
@@ -68,7 +69,7 @@ dev = [
     "mypy",
     "types-PyYAML",
     "types-jsonschema",
-    "tox"
+    "tox",
 ]
 
 cov = [
