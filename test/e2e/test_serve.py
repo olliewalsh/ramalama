@@ -288,7 +288,6 @@ def test_full_model_name_expansion():
 
 
 @pytest.mark.e2e
-@xfail_if_windows  # FIXME: Error: no container with name or ID "serve_and_stop_dyGXy" found: no such container
 @skip_if_no_container
 def test_serve_and_stop(shared_ctx, test_model):
     ctx = shared_ctx
@@ -334,7 +333,6 @@ def test_serve_and_stop(shared_ctx, test_model):
 
 
 @pytest.mark.e2e
-@xfail_if_windows  # FIXME: Container not starting?
 @skip_if_no_container
 def test_serve_multiple_models(shared_ctx, test_model):
     ctx = shared_ctx

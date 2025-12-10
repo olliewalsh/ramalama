@@ -2,6 +2,7 @@
 
 import os
 import sys
+import platform
 from pathlib import Path, PureWindowsPath
 
 
@@ -27,7 +28,7 @@ def normalize_host_path_for_container(host_path: str) -> str:
         Windows: "C:\\Users\\John\\models" -> "/c/Users/John/models"
         Linux: "/home/john/models" -> "/home/john/models"
     """
-    if sys.platform != 'win32':
+    if platform.system() != "Windows":
         # On Linux/macOS, paths are already in the correct format
         return host_path
 
@@ -61,7 +62,7 @@ def is_windows_absolute_path(path: str) -> bool:
     Returns:
         True if the path looks like a Windows absolute path (e.g., C:\\, D:\\)
     """
-    if sys.platform != 'win32':
+    if platform.system() != "Windows":
         return False
 
     return PureWindowsPath(path).is_absolute()
