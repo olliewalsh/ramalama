@@ -97,7 +97,6 @@ def add_api_key(args, headers=None):
 @dataclass
 class ChatOperationalArgs:
     initial_connection: bool = False
-    pid2kill: int | None = None
     name: str | None = None
     keepalive: int | None = None
     monitor: "ServerMonitor | None" = None
@@ -485,23 +484,13 @@ class RamaLamaShell(cmd.Cmd):
         if getattr(self.args, "initial_connection", False):
             return
 
-        if getattr(self.args, "pid2kill", False):
+        if getattr(self.args, "server_process", False):
             # Send signals to terminate process
-            # On Windows, only SIGTERM and SIGINT are supported
+            self.args.server_process.terminate()
             try:
-                os.kill(self.args.pid2kill, signal.SIGINT)
-            except (ProcessLookupError, AttributeError):
-                pass
-            try:
-                os.kill(self.args.pid2kill, signal.SIGTERM)
-            except (ProcessLookupError, AttributeError):
-                pass
-            # SIGKILL doesn't exist on Windows, use SIGTERM instead
-            if hasattr(signal, 'SIGKILL'):
-                try:
-                    os.kill(self.args.pid2kill, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                self.args.server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.args.server_process.kill()
         elif getattr(self.args, "name", None):
             args = copy.copy(self.args)
             args.ignore = True
@@ -634,49 +623,17 @@ class ServerMonitor:
         while not self._stop_event.is_set():
             try:
                 # Use Popen.poll() if we have the Popen object, otherwise use os.waitpid
-                if self.server_process:
-                    # Use Popen.poll() for non-blocking check
-                    exit_code = self.server_process.poll()
-                    if exit_code is not None:
-                        # Process has exited
-                        self._exit_info["pid"] = self.server_pid
-                        self._exit_info["type"] = "exit"
-                        self._exit_info["code"] = exit_code
-                        self._exited_event.set()
-                        # Send SIGINT to main process to interrupt the chat
-                        _thread.interrupt_main()
-                        break
-                else:
-                    # Fallback to os.waitpid for PID-based monitoring
-                    from ramalama.common import wait_for_process
-                    flags = os.WNOHANG if hasattr(os, 'WNOHANG') else 1
-                    try:
-                        pid, status = wait_for_process(self.server_pid, flags)
-                        if pid != 0:
-                            # Process has exited
-                            self._exit_info["pid"] = self.server_pid
-                            self._exit_info["status"] = status
-                            
-                            if os.WIFEXITED(status):
-                                self._exit_info["type"] = "exit"
-                                self._exit_info["code"] = os.WEXITSTATUS(status)
-                            elif os.WIFSIGNALED(status):
-                                self._exit_info["type"] = "signal"
-                                self._exit_info["signal"] = os.WTERMSIG(status)
-                            else:
-                                self._exit_info["type"] = "unknown"
-                            
-                            self._exited_event.set()
-                            # Send SIGINT to main process to interrupt the chat
-                            _thread.interrupt_main()
-                            break
-                    except ChildProcessError:
-                        # Process doesn't exist or already reaped
-                        self._exit_info["pid"] = self.server_pid
-                        self._exit_info["type"] = "missing"
-                        self._exited_event.set()
-                        _thread.interrupt_main()
-                        break
+                # Use Popen.poll() for non-blocking check
+                exit_code = self.server_process.poll()
+                if exit_code is not None:
+                    # Process has exited
+                    self._exit_info["pid"] = self.server_pid
+                    self._exit_info["type"] = "exit"
+                    self._exit_info["code"] = exit_code
+                    self._exited_event.set()
+                    # Send SIGINT to main process to interrupt the chat
+                    _thread.interrupt_main()
+                    break
             except Exception as e:
                 logger.debug(f"Error monitoring process: {e}")
             
@@ -778,14 +735,12 @@ def chat(args: ChatArgsType, operational_args: ChatOperationalArgs | None = None
         signal.alarm(convert_to_seconds(args.keepalive))  # type: ignore
 
     # Start server process or container monitoring
-    # Check if we should monitor a process (pid2kill) or container (name)
     server_process = getattr(args, "server_process", None)
-    pid2kill = getattr(args, "pid2kill", None)
     container_name = getattr(args, "name", None)
 
-    if server_process or pid2kill:
+    if server_process:
         # Monitor the server process (prefer Popen object if available)
-        monitor = ServerMonitor(server_process=server_process, server_pid=pid2kill)
+        monitor = ServerMonitor(server_process=server_process)
     elif container_name:
         # Monitor the container
         conman = getattr(args, "engine", CONFIG.engine)

@@ -112,26 +112,6 @@ def perror(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 
-def wait_for_process(pid, flags=0):
-    """
-    Cross-platform process waiting function.
-    
-    Args:
-        pid: Process ID to wait for (must be a child process)
-        flags: Wait flags (0 for blocking, or os.WNOHANG for non-blocking)
-    
-    Returns:
-        Tuple of (pid, status) on both Unix and Windows
-        On non-blocking mode, returns (0, None) if process is still running
-    
-    Note: os.waitpid is available on Windows and works for child processes.
-    See: https://docs.python.org/3/library/os.html#os.waitpid
-    """
-    # os.waitpid is available on both Unix and Windows
-    # It works for child processes on both platforms
-    return os.waitpid(pid, flags)
-
-
 def available(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
@@ -144,36 +124,14 @@ def quoted(arr) -> str:
 def exec_cmd(args, stdout2null: bool = False, stderr2null: bool = False):
     logger.debug(f"exec_cmd: {quoted(args)}")
     
-    # On Windows, os.execvp doesn't work the same way, use subprocess instead
-    if platform.system() == "Windows":
-        stdout_target = subprocess.DEVNULL if stdout2null else None
-        stderr_target = subprocess.DEVNULL if stderr2null else None
-        try:
-            # Use subprocess to execute and replace current process
-            # Note: This doesn't replace the process like execvp, but runs it as a subprocess
-            # For true exec behavior on Windows, we'd need os.execv or os.execve
-            # But subprocess.run is more compatible
-            result = subprocess.run(args, stdout=stdout_target, stderr=stderr_target, check=False)
-            sys.exit(result.returncode)
-        except Exception as e:
-            perror(f"Failed to execute {args[0]}: {e}")
-            raise
-    else:
-        # On Unix, use execvp for true process replacement
-        if stdout2null:
-            with open(os.devnull, 'w') as devnull:
-                os.dup2(devnull.fileno(), sys.stdout.fileno())
-
-        if stderr2null:
-            with open(os.devnull, 'w') as devnull:
-                os.dup2(devnull.fileno(), sys.stderr.fileno())
-
-        try:
-            return os.execvp(args[0], args)
-        except Exception:
-            perror(f"os.execvp({args[0]}, {args})")
-            raise
-
+    stdout_target = subprocess.DEVNULL if stdout2null else None
+    stderr_target = subprocess.DEVNULL if stderr2null else None
+    try:
+        result = subprocess.run(args, stdout=stdout_target, stderr=stderr_target, check=False)
+        sys.exit(result.returncode)
+    except Exception as e:
+        perror(f"Failed to execute {args[0]}: {e}")
+        raise
 
 def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_all=False, encoding=None, env=None):
     """
