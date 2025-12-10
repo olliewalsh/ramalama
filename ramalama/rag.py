@@ -178,15 +178,16 @@ class RagTransport(OCI):
         super()._handle_container_chat(args, pid)
 
     def _start_model(self, args, cmd: list[str]):
-        pid = self.imodel._fork_and_serve(args, self.model_cmd)
-        if pid:
-            _, status = os.waitpid(pid, 0)
-            if status != 0:
+        process = self.imodel._fork_and_serve(args, self.model_cmd)
+        if process:
+            # Wait for the process to complete (blocking)
+            exit_code = process.wait()
+            if exit_code != 0:
                 raise subprocess.CalledProcessError(
-                    os.waitstatus_to_exitcode(status),
+                    exit_code,
                     " ".join(cmd),
                 )
-        return pid
+        return process.pid if process else None
 
     def serve(self, args, cmd: list[str]):
         pid = self._start_model(args.model_args, cmd)

@@ -1,6 +1,7 @@
 """utilities for working with AMDKFD driver"""
 
 import glob
+import sys
 
 # Heap types in memory properties
 #
@@ -21,6 +22,10 @@ def parse_props(path):
 
 def gpus():
     """Yields GPU nodes within KFD topology and their properties"""
+    # /sys/devices/virtual/kfd is Linux-specific, skip on Windows
+    if sys.platform == "win32":
+        return
+    
     for np in sorted(glob.glob('/sys/devices/virtual/kfd/kfd/topology/nodes/*')):
         props = parse_props(np + '/properties')
 

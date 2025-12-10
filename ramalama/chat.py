@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from ramalama.arg_types import ChatArgsType
-from ramalama.common import perror
+from ramalama.common import perror, stdin_isatty
 from ramalama.config import CONFIG
 from ramalama.console import EMOJI, should_colorize
 from ramalama.engine import stop_container
@@ -354,7 +354,7 @@ class RamaLamaShell(cmd.Cmd):
 
     def handle_args(self, monitor):
         prompt = " ".join(self.args.ARGS) if self.args.ARGS else None
-        if not sys.stdin.isatty():
+        if not stdin_isatty():
             stdin = sys.stdin.read()
             if prompt:
                 prompt += f"\n\n{stdin}"
@@ -448,7 +448,7 @@ class RamaLamaShell(cmd.Cmd):
                 response = urllib.request.urlopen(request)
                 break
             except Exception:
-                if sys.stdout.isatty():
+                if stdin_isatty():
                     perror(f"\r{c}", end="", flush=True)
 
                 if total_time_slept > max_timeout:
@@ -549,40 +549,43 @@ class ServerMonitor:
     def __init__(
         self,
         server_pid=None,
+        server_process=None,
         container_name=None,
         container_engine=None,
         join_timeout=3.0,
         check_interval=0.5,
+        inspect_timeout=30.0,
     ):
         """
         Initialize the server monitor.
 
         Args:
             server_pid: Process ID to monitor (for direct process monitoring)
+            server_process: subprocess.Popen object to monitor (preferred over server_pid)
             container_name: Container name to monitor (for container monitoring)
             container_engine: Container engine command (podman/docker)
             join_timeout: Seconds for thread join when stopping (default: 3.0)
             check_interval: Seconds between monitoring checks (default: 0.5)
+            inspect_timeout: Seconds to wait for container inspect command to complete (default: 30.0)
 
-        Note: If neither server_pid nor container_name is provided, the monitor
+        Note: If neither server_pid/server_process nor container_name is provided, the monitor
         operates in no-op mode (no actual monitoring occurs).
         """
-        self.server_pid = server_pid
+        self.server_process = server_process
+        self.server_pid = server_pid if server_pid else (server_process.pid if server_process else None)
         self.container_name = container_name
         self.container_engine = container_engine
         self.timeout = join_timeout
         self.check_interval = check_interval
-
+        self.inspect_timeout = inspect_timeout
         self._stop_event = threading.Event()
         self._exited_event = threading.Event()
         self._exit_info = {}
         self._monitor_thread = None
 
         # Determine monitoring mode
-        if server_pid:
-            if sys.platform == "win32":
-                # os.waitpid() is not available for non-child processes on Windows.
-                raise NotImplementedError("Process monitoring by PID is not supported on Windows.")
+        if self.server_process or self.server_pid:
+            # Process monitoring using Popen object (preferred) or PID
             self._mode = "process"
         elif container_name and container_engine:
             self._mode = "container"
@@ -630,31 +633,53 @@ class ServerMonitor:
         """Monitor the server process and report if it exits."""
         while not self._stop_event.is_set():
             try:
-                # Use waitpid with WNOHANG to check without blocking
-                pid, status = os.waitpid(self.server_pid, os.WNOHANG)
-                if pid != 0:
-                    # Process has exited
-                    self._exit_info["pid"] = self.server_pid
-                    self._exit_info["status"] = status
-                    if os.WIFEXITED(status):
+                # Use Popen.poll() if we have the Popen object, otherwise use os.waitpid
+                if self.server_process:
+                    # Use Popen.poll() for non-blocking check
+                    exit_code = self.server_process.poll()
+                    if exit_code is not None:
+                        # Process has exited
+                        self._exit_info["pid"] = self.server_pid
                         self._exit_info["type"] = "exit"
-                        self._exit_info["code"] = os.WEXITSTATUS(status)
-                    elif os.WIFSIGNALED(status):
-                        self._exit_info["type"] = "signal"
-                        self._exit_info["signal"] = os.WTERMSIG(status)
-                    else:
-                        self._exit_info["type"] = "unknown"
-                    self._exited_event.set()
-                    # Send SIGINT to main process to interrupt the chat
-                    _thread.interrupt_main()
-                    break
-            except ChildProcessError:
-                # Process doesn't exist or already reaped
-                self._exit_info["pid"] = self.server_pid
-                self._exit_info["type"] = "missing"
-                self._exited_event.set()
-                _thread.interrupt_main()
-                break
+                        self._exit_info["code"] = exit_code
+                        self._exited_event.set()
+                        # Send SIGINT to main process to interrupt the chat
+                        _thread.interrupt_main()
+                        break
+                else:
+                    # Fallback to os.waitpid for PID-based monitoring
+                    from ramalama.common import wait_for_process
+                    flags = os.WNOHANG if hasattr(os, 'WNOHANG') else 1
+                    try:
+                        pid, status = wait_for_process(self.server_pid, flags)
+                        if pid != 0:
+                            # Process has exited
+                            self._exit_info["pid"] = self.server_pid
+                            self._exit_info["status"] = status
+                            
+                            if os.WIFEXITED(status):
+                                self._exit_info["type"] = "exit"
+                                self._exit_info["code"] = os.WEXITSTATUS(status)
+                            elif os.WIFSIGNALED(status):
+                                self._exit_info["type"] = "signal"
+                                self._exit_info["signal"] = os.WTERMSIG(status)
+                            else:
+                                self._exit_info["type"] = "unknown"
+                            
+                            self._exited_event.set()
+                            # Send SIGINT to main process to interrupt the chat
+                            _thread.interrupt_main()
+                            break
+                    except ChildProcessError:
+                        # Process doesn't exist or already reaped
+                        self._exit_info["pid"] = self.server_pid
+                        self._exit_info["type"] = "missing"
+                        self._exited_event.set()
+                        _thread.interrupt_main()
+                        break
+            except Exception as e:
+                logger.debug(f"Error monitoring process: {e}")
+            
             # Use wait() instead of sleep() for responsive shutdown
             self._stop_event.wait(self.check_interval)
 
@@ -668,7 +693,7 @@ class ServerMonitor:
                     [self.container_engine, "inspect", "--format", inspect_format, self.container_name],
                     capture_output=True,
                     text=True,
-                    timeout=self.check_interval,
+                    timeout=self.inspect_timeout,
                 )
                 output_lines = result.stdout.strip().split('\n')
                 status = output_lines[0] if output_lines else ""
@@ -754,12 +779,13 @@ def chat(args: ChatArgsType, operational_args: ChatOperationalArgs | None = None
 
     # Start server process or container monitoring
     # Check if we should monitor a process (pid2kill) or container (name)
+    server_process = getattr(args, "server_process", None)
     pid2kill = getattr(args, "pid2kill", None)
     container_name = getattr(args, "name", None)
 
-    if pid2kill:
-        # Monitor the server process
-        monitor = ServerMonitor(server_pid=pid2kill)
+    if server_process or pid2kill:
+        # Monitor the server process (prefer Popen object if available)
+        monitor = ServerMonitor(server_process=server_process, server_pid=pid2kill)
     elif container_name:
         # Monitor the container
         conman = getattr(args, "engine", CONFIG.engine)

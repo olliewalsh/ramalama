@@ -37,9 +37,12 @@ def normalize_host_path_for_container(host_path: str) -> str:
     # First, resolve symlinks and make the path absolute.
     path = Path(host_path).resolve()
 
-    # Handle UNC paths (e.g., \\server\share). On Windows, these resolve to
-    # absolute paths but don't have a drive letter.
-    if not path.drive:
+    # Handle UNC paths to container filesystem (e.g., \\wsl.localhost\podman-machine-default\home\user\.local\share\ramalama\store)
+    # NOTE: UNC paths cannot be accessed implicitly from the container, would need to smb mount
+    if path.drive.startswith("\\\\"):
+        return '/' + path.relative_to(path.drive).as_posix()
+    
+    if not path.drive :
         return path.as_posix()
 
     # Handle paths with drive letters

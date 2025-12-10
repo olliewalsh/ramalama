@@ -3,9 +3,11 @@ import shutil
 import sys
 from dataclasses import dataclass
 
+from ramalama.common import stdout_isatty
+
 
 def get_terminal_width():
-    return shutil.get_terminal_size().columns if sys.stdout.isatty() else 80
+    return shutil.get_terminal_size().columns if stdout_isatty() else 80
 
 
 def adjust_new_line(line: str) -> str:

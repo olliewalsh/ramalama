@@ -25,7 +25,8 @@ class File:
             try:
                 if sys.platform == 'win32':
                     # Windows file locking using msvcrt
-                    msvcrt.locking(self.fd, msvcrt.LK_NBLCK, 1)
+                    # msvcrt.locking(self.fd, msvcrt.LK_NBLCK, 1)
+                    pass
                 else:
                     # Unix file locking using fcntl
                     fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -39,8 +40,9 @@ class File:
         if self.fd >= 0:
             try:
                 if sys.platform == 'win32':
-                    # Unlock on Windows
-                    msvcrt.locking(self.fd, msvcrt.LK_UNLCK, 1)
+                    # Unlock on Windows 
+                    # msvcrt.locking(self.fd, msvcrt.LK_UNLCK, 1)
+                    pass
                 else:
                     # Unlock on Unix
                     fcntl.flock(self.fd, fcntl.LOCK_UN)
