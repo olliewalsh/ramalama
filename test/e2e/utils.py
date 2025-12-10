@@ -27,21 +27,21 @@ class RamalamaExecWorkspace:
         if self.workspace_dir and self.config:
             config_path = Path(self.workspace_dir) / "ramalama.conf"
             with config_path.open("w") as f:
-                f.write(self.config.format(workspace_dir=self.workspace_dir))
-                self.environ["RAMALAMA_CONFIG"] = config_path.as_posix()
+                f.write(self.config.format(workspace_dir=self.workspace_dir, storage_dir=self.storage_dir))
+                self.environ["RAMALAMA_CONFIG"] = str(config_path)
 
         # Create storage directory
         if self.isolated or self.config:
             storage_dir = Path(self.workspace_dir) / ".storage"
             storage_dir.mkdir()
-            self.storage_dir = storage_dir.as_posix()
+            self.storage_dir = str(storage_dir)
 
         # Enable env variables from pytest addoption parameters
         if container_discover:
             self.environ["RAMALAMA_IN_CONTAINER"] = "True" if ramalama_container else "False"
         if container_engine_discover:
             self.environ["RAMALAMA_CONTAINER_ENGINE"] = ramalama_container_engine
-
+        
         # Update the environ with the extra env vars provided if any
         if env_vars:
             self.environ |= env_vars

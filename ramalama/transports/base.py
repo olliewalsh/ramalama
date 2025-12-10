@@ -8,6 +8,9 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
+if sys.platform == "win32":
+    import multiprocessing
+
 import ramalama.chat as chat
 from ramalama.common import (
     MNT_DIR,
@@ -19,6 +22,7 @@ from ramalama.common import (
     perror,
     populate_volume_from_image,
     set_accel_env_vars,
+    stdin_isatty,
 )
 from ramalama.compose import Compose
 from ramalama.config import CONFIG, DEFAULT_PORT_RANGE
@@ -310,7 +314,7 @@ class Transport(TransportBase):
             args.UNRESOLVED_MODEL = args.MODEL
             args.MODEL = self.resolve_model()
         self.engine = self.new_engine(args)
-        if args.subcommand == "run" and not getattr(args, "ARGS", None) and sys.stdin.isatty():
+        if args.subcommand == "run" and not getattr(args, "ARGS", None) and stdin_isatty():
             self.engine.add(["-i"])
 
         self.engine.add(
@@ -392,18 +396,65 @@ class Transport(TransportBase):
 
         args.noout = not args.debug
 
-        pid = self._fork_and_serve(args, server_cmd)
-        if pid:
-            return self._connect_and_chat(args, pid)
+        process = self._fork_and_serve(args, server_cmd)
+        if process:
+            return self._connect_and_chat(args, process)
 
     def _fork_and_serve(self, args, cmd: list[str]):
         if args.container:
             args.name = self.get_container_name(args)
-        pid = os.fork()
-        if pid == 0:
-            # Child process - start the server
-            self._start_server(args, cmd)
-        return pid
+        
+        # Use subprocess.Popen for all platforms
+        # Prepare args for the server
+        args.host = CONFIG.host
+        args.generate = ""
+        args.detach = True
+        
+        if args.container:
+            # For container mode, set up the container and start it with subprocess
+            self.setup_container(args)
+            self.setup_mounts(args)
+            # Make sure Image precedes cmd_args
+            self.engine.add([args.image] + cmd)
+
+            if args.dryrun:
+                dry_run(self.engine.exec_args)
+                return
+            
+            # Start the container using subprocess.Popen
+            stdout_target = subprocess.DEVNULL if args.noout else None
+            stderr_target = subprocess.DEVNULL if args.noout else None
+            
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if False and sys.platform == "win32" else 0
+            process = subprocess.Popen(
+                self.engine.exec_args,
+                stdout=stdout_target,
+                stderr=stderr_target,
+                creationflags=creationflags,
+            )
+            return process
+        else:
+            # Non-container mode: run the command directly with subprocess
+            stdout_target = subprocess.DEVNULL if args.noout else None
+            stderr_target = subprocess.DEVNULL if args.noout else None
+            
+            # Set up environment variables
+            env = os.environ.copy()
+            set_accel_env_vars()
+            # Merge any additional env vars that were set
+            for key, value in os.environ.items():
+                if key.startswith(('CUDA_', 'HIP_', 'INTEL_', 'ASAHI_', 'ASCEND_', 'MUSA_', 'HSA_')):
+                    env[key] = value
+            
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if False and sys.platform == "win32" else 0
+            process = subprocess.Popen(
+                cmd,
+                stdout=stdout_target,
+                stderr=stderr_target,
+                env=env,
+                creationflags=creationflags
+            )
+            return process
 
     def _start_server(self, args, cmd: list[str]):
         """Start the server in the child process."""
@@ -412,17 +463,20 @@ class Transport(TransportBase):
         args.detach = True
         self.serve(args, cmd)
 
-    def _connect_and_chat(self, args, server_pid):
+    def _connect_and_chat(self, args, server_process):
         """Connect to the server and start chat in the parent process."""
         args.url = f"http://127.0.0.1:{args.port}/v1"
         if getattr(args, "runtime", None) == "mlx":
             args.prefix = "🍏 > "
         args.pid2kill = ""
+        
+        # Store the Popen object for monitoring
+        #args.server_process = server_process
 
         if args.container:
-            return self._handle_container_chat(args, server_pid)
+            return self._handle_container_chat(args, server_process)
         else:
-            args.pid2kill = server_pid
+            args.pid2kill = server_process.pid
             if getattr(args, "runtime", None) == "mlx":
                 return self._handle_mlx_chat(args)
             chat.chat(args)
@@ -434,10 +488,11 @@ class Transport(TransportBase):
     def wait_for_healthy(self, args):
         wait_for_healthy(args, is_healthy)
 
-    def _handle_container_chat(self, args, server_pid):
+    def _handle_container_chat(self, args, server_process):
         """Handle chat for container-based execution."""
-        _, status = os.waitpid(server_pid, 0)
-        if status != 0:
+        # Wait for the server process to complete (blocking)
+        exit_code = server_process.wait()
+        if exit_code != 0:
             raise ValueError(f"Failed to serve model {self.model_name}, for ramalama run command")
 
         if not args.dryrun:

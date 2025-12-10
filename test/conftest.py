@@ -78,6 +78,6 @@ skip_if_no_huggingface_cli = pytest.mark.skipif(shutil.which("hf") is None, reas
 skip_if_no_llama_bench = pytest.mark.skipif(shutil.which("llama-bench") is None, reason="llama-bench not installed")
 
 xfail_if_windows = pytest.mark.xfail(
-    platform.system() == "Windows",
+    platform.system() == "Windows" and False,
     reason="Known failure on Windows",
 )
