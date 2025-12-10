@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from ramalama.arg_types import ChatArgsType
-from ramalama.common import perror, stdin_isatty
+from ramalama.common import perror
 from ramalama.config import CONFIG
 from ramalama.console import EMOJI, should_colorize
 from ramalama.engine import stop_container
@@ -354,7 +354,7 @@ class RamaLamaShell(cmd.Cmd):
 
     def handle_args(self, monitor):
         prompt = " ".join(self.args.ARGS) if self.args.ARGS else None
-        if not stdin_isatty():
+        if not sys.stdin.isatty():
             stdin = sys.stdin.read()
             if prompt:
                 prompt += f"\n\n{stdin}"
@@ -448,7 +448,7 @@ class RamaLamaShell(cmd.Cmd):
                 response = urllib.request.urlopen(request)
                 break
             except Exception:
-                if stdin_isatty():
+                if sys.stdin.isatty():
                     perror(f"\r{c}", end="", flush=True)
 
                 if total_time_slept > max_timeout:

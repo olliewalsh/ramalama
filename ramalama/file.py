@@ -1,10 +1,10 @@
 # The following code is inspired from: https://github.com/ericcurtin/lm-pull/blob/main/lm-pull.py
 
 import os
-import sys
+import platform
 
 # Import platform-specific locking mechanisms
-if sys.platform == 'win32':
+if platform.system() == "Windows":
     import msvcrt
 else:
     import fcntl
@@ -23,7 +23,7 @@ class File:
         if self.file:
             self.fd = self.file.fileno()
             try:
-                if sys.platform == 'win32':
+                if platform.system() == "Windows":
                     # Windows file locking using msvcrt
                     # msvcrt.locking(self.fd, msvcrt.LK_NBLCK, 1)
                     pass
@@ -39,7 +39,7 @@ class File:
     def __del__(self):
         if self.fd >= 0:
             try:
-                if sys.platform == 'win32':
+                if platform.system() == "Windows":
                     # Unlock on Windows 
                     # msvcrt.locking(self.fd, msvcrt.LK_UNLCK, 1)
                     pass

@@ -1,15 +1,10 @@
 import os
-import platform
+import sys
 import random
 import socket
 import subprocess
-import sys
-import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
-
-if sys.platform == "win32":
-    import multiprocessing
 
 import ramalama.chat as chat
 from ramalama.common import (
@@ -22,7 +17,6 @@ from ramalama.common import (
     perror,
     populate_volume_from_image,
     set_accel_env_vars,
-    stdin_isatty,
 )
 from ramalama.compose import Compose
 from ramalama.config import CONFIG, DEFAULT_PORT_RANGE
@@ -314,7 +308,7 @@ class Transport(TransportBase):
             args.UNRESOLVED_MODEL = args.MODEL
             args.MODEL = self.resolve_model()
         self.engine = self.new_engine(args)
-        if args.subcommand == "run" and not getattr(args, "ARGS", None) and stdin_isatty():
+        if args.subcommand == "run" and not getattr(args, "ARGS", None) and sys.stdin.isatty():
             self.engine.add(["-i"])
 
         self.engine.add(
@@ -424,35 +418,20 @@ class Transport(TransportBase):
             # Start the container using subprocess.Popen
             stdout_target = subprocess.DEVNULL if args.noout else None
             stderr_target = subprocess.DEVNULL if args.noout else None
-            
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if False and sys.platform == "win32" else 0
             process = subprocess.Popen(
                 self.engine.exec_args,
                 stdout=stdout_target,
                 stderr=stderr_target,
-                creationflags=creationflags,
             )
             return process
         else:
             # Non-container mode: run the command directly with subprocess
             stdout_target = subprocess.DEVNULL if args.noout else None
             stderr_target = subprocess.DEVNULL if args.noout else None
-            
-            # Set up environment variables
-            env = os.environ.copy()
-            set_accel_env_vars()
-            # Merge any additional env vars that were set
-            for key, value in os.environ.items():
-                if key.startswith(('CUDA_', 'HIP_', 'INTEL_', 'ASAHI_', 'ASCEND_', 'MUSA_', 'HSA_')):
-                    env[key] = value
-            
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if False and sys.platform == "win32" else 0
             process = subprocess.Popen(
                 cmd,
                 stdout=stdout_target,
                 stderr=stderr_target,
-                env=env,
-                creationflags=creationflags
             )
             return process
 

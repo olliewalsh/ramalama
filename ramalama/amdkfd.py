@@ -2,6 +2,7 @@
 
 import glob
 import sys
+import platform
 
 # Heap types in memory properties
 #
@@ -23,7 +24,7 @@ def parse_props(path):
 def gpus():
     """Yields GPU nodes within KFD topology and their properties"""
     # /sys/devices/virtual/kfd is Linux-specific, skip on Windows
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
         return
     
     for np in sorted(glob.glob('/sys/devices/virtual/kfd/kfd/topology/nodes/*')):

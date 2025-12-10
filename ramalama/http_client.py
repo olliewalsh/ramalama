@@ -7,7 +7,7 @@ import time
 import urllib.request
 
 import ramalama.console as console
-from ramalama.common import perror, stdout_isatty
+from ramalama.common import perror
 from ramalama.config import CONFIG
 from ramalama.file import File
 from ramalama.logger import logger
@@ -178,7 +178,7 @@ def download_file(url: str, dest_path: str, headers: dict[str, str] | None = Non
     headers = headers or {}
 
     # If not running in a TTY, disable progress to prevent CI pollution
-    if not stdout_isatty():
+    if not sys.stdout.isatty():
         show_progress = False
 
     http_client = HttpClient()

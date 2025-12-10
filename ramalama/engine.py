@@ -192,7 +192,7 @@ class Engine(BaseEngine):
             super().add_privileged_options()
 
     def use_tty(self) -> bool:
-        if not ramalama.common.stdin_isatty():
+        if not sys.stdin.isatty():
             return False
         if getattr(self.args, "ARGS", None):
             return False

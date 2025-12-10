@@ -145,7 +145,7 @@ def exec_cmd(args, stdout2null: bool = False, stderr2null: bool = False):
     logger.debug(f"exec_cmd: {quoted(args)}")
     
     # On Windows, os.execvp doesn't work the same way, use subprocess instead
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
         stdout_target = subprocess.DEVNULL if stdout2null else None
         stderr_target = subprocess.DEVNULL if stderr2null else None
         try:
@@ -402,7 +402,7 @@ def find_in_cdi(devices: list[str]) -> tuple[list[str], list[str]]:
 
 def check_asahi() -> Literal["asahi"] | None:
     # /proc/device-tree is Linux-specific, skip on Windows
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
         return None
     
     if os.path.exists('/proc/device-tree/compatible'):
@@ -533,7 +533,7 @@ def check_intel() -> Literal["intel"] | None:
         b"0x7d55",
     )
     # /sys/bus/pci is Linux-specific, skip on Windows
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
         return None
     
     intel_driver_glob_patterns = ["/sys/bus/pci/drivers/i915/*/device", "/sys/bus/pci/drivers/xe/*/device"]
@@ -799,17 +799,3 @@ def attempt_to_use_versioned(conman: str, image: str, vers: str, quiet: bool, sh
 
     except Exception:
         return False
-
-def stdin_isatty() -> bool:
-    if sys.platform != "win32":
-        return sys.stdin.isatty()
-    handle = ctypes.windll.kernel32.GetStdHandle(ctypes.c_int(sys.stdin.fileno()))
-    type = ctypes.windll.kernel32.GetFileType(handle)
-    return type == 0x0002 # FILE_TYPE_CHAR
-
-def stdout_isatty() -> bool:
-    if sys.platform != "win32":
-        return sys.stdout.isatty()
-    handle = ctypes.windll.kernel32.GetStdHandle(ctypes.c_int(sys.stdout.fileno()))
-    type = ctypes.windll.kernel32.GetFileType(handle)
-    return type == 0x0002 # FILE_TYPE_CHAR

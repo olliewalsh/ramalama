@@ -3,11 +3,9 @@
 import os
 import sys
 
-from ramalama.common import stdin_isatty
-
 
 def main():
-    if not stdin_isatty():
+    if not sys.stdout.isatty():
         sys.stdout.reconfigure(line_buffering=True)
 
     if sys.platform != 'win32':
