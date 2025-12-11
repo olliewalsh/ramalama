@@ -427,6 +427,10 @@ class Transport(TransportBase):
             )
             return process
         else:
+            if args.dryrun:
+                dry_run(cmd)
+                return
+
             # Non-container mode: run the command directly with subprocess
             process = subprocess.Popen(
                 cmd,
