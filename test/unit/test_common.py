@@ -123,22 +123,24 @@ def test_accel_image(accel_env: str, env_override, config_override: str, expecte
     monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
     monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
 
-    with tempfile.NamedTemporaryFile('w', delete_on_close=False) as f:
-        cmdline = []
-        cmdline.extend(["run", "granite"])
+    cmdline = []
+    cmdline.extend(["run", "granite"])
 
-        env = {}
+    env = {}
+
+    tmpfile = tempfile.NamedTemporaryFile('w', delete=False)
+    try:
         if config_override:
-            f.write(
+            tmpfile.write(
                 f"""\
 [ramalama]
 image = "{config_override}"
                 """
             )
-            f.flush()
-            env["RAMALAMA_CONFIG"] = f.name
+            env["RAMALAMA_CONFIG"] = tmpfile.name
         else:
             env["RAMALAMA_CONFIG"] = "/dev/null"
+        tmpfile.close()
 
         if accel_env:
             env[accel_env] = "1"
@@ -151,6 +153,9 @@ image = "{config_override}"
                 parser = create_argument_parser("test_accel_image")
                 configure_subcommands(parser)
                 assert accel_image(config) == expected_result
+    finally:
+        tmpfile.close()
+        os.unlink(tmpfile.name)
 
 
 @patch("ramalama.config.CONFIG")

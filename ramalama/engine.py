@@ -248,10 +248,14 @@ class BuildEngine(BaseEngine):
         If tag is provided, the image will be tagged.
         Return the ID of the built image.
         """
-        with NamedTemporaryFile(delete_on_close=False) as tfile:
+        tfile = NamedTemporaryFile(delete=False)
+        try:
             tfile.write(content.encode("utf-8"))
             tfile.close()
             return self.build(tfile.name, context, tag=tag)
+        finally:
+            tfile.close()
+            os.unlink(tfile.name)
 
 
 def dry_run(args):
