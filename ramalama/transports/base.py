@@ -446,12 +446,12 @@ class Transport(TransportBase):
         if getattr(args, "runtime", None) == "mlx":
             args.prefix = "🍏 > "
         
-        # Store the Popen object for monitoring
-        args.server_process = server_process
-
         if args.container:
             return self._handle_container_chat(args, server_process)
         else:
+            # Store the Popen object for monitoring
+            args.server_process = server_process
+
             if getattr(args, "runtime", None) == "mlx":
                 return self._handle_mlx_chat(args)
             chat.chat(args)

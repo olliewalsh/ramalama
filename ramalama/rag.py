@@ -190,13 +190,32 @@ class RagTransport(OCI):
         return process.pid if process else None
 
     def serve(self, args, cmd: list[str]):
-        pid = self._start_model(args.model_args, cmd)
-        if pid:
-            super().serve(args, cmd)
+        args.model_args.name = self.imodel.get_container_name(args.model_args)
+        process = self.imodel._fork_and_serve(args.model_args, self.model_cmd)
+        if not args.dryrun:
+            if process.wait() != 0:
+                raise subprocess.CalledProcessError(
+                    process.returncode,
+                    " ".join(model_cmd),
+                )
+        super().serve(args, cmd)
 
     def run(self, args, cmd: list[str]):
         args.model_args.name = self.imodel.get_container_name(args.model_args)
-        super().run(args, cmd)
+        processa = self._fork_and_serve(args, cmd)
+        processb = self.imodel._fork_and_serve(args.model_args, self.model_cmd)
+        if not args.dryrun:
+            if processa.wait() != 0:
+                raise subprocess.CalledProcessError(
+                    processa.returncode,
+                    " ".join(cmd),
+                )
+            if processb.wait() != 0:
+                raise subprocess.CalledProcessError(
+                    processb.returncode,
+                    " ".join(model_cmd),
+                )
+            return self._connect_and_chat(args, processb)
 
     def wait_for_healthy(self, args):
         self.imodel.wait_for_healthy(args.model_args)
