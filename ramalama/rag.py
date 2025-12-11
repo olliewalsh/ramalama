@@ -202,20 +202,20 @@ class RagTransport(OCI):
 
     def run(self, args, cmd: list[str]):
         args.model_args.name = self.imodel.get_container_name(args.model_args)
-        processa = self._fork_and_serve(args, cmd)
-        processb = self.imodel._fork_and_serve(args.model_args, self.model_cmd)
+        process = self.imodel._fork_and_serve(args.model_args, self.model_cmd)
+        rag_process = self._fork_and_serve(args, cmd)
         if not args.dryrun:
-            if processa.wait() != 0:
+            if process.wait() != 0:
                 raise subprocess.CalledProcessError(
-                    processa.returncode,
-                    " ".join(cmd),
-                )
-            if processb.wait() != 0:
-                raise subprocess.CalledProcessError(
-                    processb.returncode,
+                    process.returncode,
                     " ".join(self.model_cmd),
                 )
-            return self._connect_and_chat(args, processb)
+            if rag_process.wait() != 0:
+                raise subprocess.CalledProcessError(
+                    rag_process.returncode,
+                    " ".join(cmd),
+                )
+            return self._connect_and_chat(args, process)
 
     def wait_for_healthy(self, args):
         self.imodel.wait_for_healthy(args.model_args)
