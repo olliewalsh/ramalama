@@ -210,11 +210,11 @@ class TestMLXRuntime:
 
     @patch('ramalama.transports.base.platform.system')
     @patch('ramalama.transports.base.platform.machine')
-    @patch('ramalama.transports.base.Transport._fork_and_serve', return_value=MagicMock())
+    @patch('ramalama.transports.base.Transport.serve_nonblocking', return_value=MagicMock())
     @patch('ramalama.chat.chat')
     @patch('socket.socket')
     def test_mlx_run_uses_server_client_model(
-        self, mock_socket_class, mock_chat, mock_fork_and_serve, mock_machine, mock_system
+        self, mock_socket_class, mock_chat, mock_serve_nonblocking, mock_machine, mock_system
     ):
         """Test that MLX runtime uses server-client model in run method"""
         mock_system.return_value = "Darwin"
@@ -250,8 +250,8 @@ class TestMLXRuntime:
             with patch('sys.stdin.isatty', return_value=True):  # Mock tty for interactive mode
                 model.run(args, cmd)
 
-        # Verify that _fork_and_serve was called (indicating server-client model)
-        mock_fork_and_serve.assert_called_once()
+        # Verify that serve_nonblocking was called (indicating server-client model)
+        mock_serve_nonblocking.assert_called_once()
 
         # Verify that chat.chat was called (parent process)
         mock_chat.assert_called_once()

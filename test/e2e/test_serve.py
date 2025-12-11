@@ -758,7 +758,6 @@ def test_serve_with_non_existing_images():
 
 
 @pytest.mark.e2e
-@xfail_if_windows  # FIXME: AttributeError: module 'os' has no attribute 'fork'
 @skip_if_no_container
 @skip_if_darwin
 @skip_if_docker

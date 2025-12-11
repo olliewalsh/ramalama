@@ -390,11 +390,11 @@ class Transport(TransportBase):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
 
-        process = self._fork_and_serve(args, server_cmd)
+        process = self.serve_nonblocking(args, server_cmd)
         if process:
             return self._connect_and_chat(args, process)
 
-    def _fork_and_serve(self, args, cmd: list[str]):
+    def serve_nonblocking(self, args, cmd: list[str]) -> subprocess.Popen | None:
         if args.container:
             args.name = self.get_container_name(args)
 
@@ -436,13 +436,6 @@ class Transport(TransportBase):
                 cmd,
             )
             return process
-
-    def _start_server(self, args, cmd: list[str]):
-        """Start the server in the child process."""
-        args.host = CONFIG.host
-        args.generate = ""
-        args.detach = True
-        self.serve(args, cmd)
 
     def _connect_and_chat(self, args, server_process):
         """Connect to the server and start chat in the parent process."""
@@ -514,7 +507,7 @@ class Transport(TransportBase):
             except Exception as e:
                 if i >= max_retries - 1:
                     perror(f"Error: Failed to connect to MLX server after {max_retries} attempts: {e}")
-                    self._cleanup_server_process(args.pid2kill)
+                    self._cleanup_server_process(args.server_process)
                     raise e
                 logger.debug(f"Connection attempt failed, retrying... (attempt {i + 1}/{max_retries}): {e}")
                 time.sleep(3)
@@ -532,32 +525,16 @@ class Transport(TransportBase):
         except (socket.error, ValueError):
             return False
 
-    def _cleanup_server_process(self, pid):
+    def _cleanup_server_process(self, process):
         """Clean up the server process."""
-        if not pid:
+        if not process:
             return
 
-        import signal
-
+        process.terminate()
         try:
-            # Try graceful termination first
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)  # Give it time to terminate gracefully
-
-            # Force kill if still running (SIGKILL is Unix-only)
-            if hasattr(signal, 'SIGKILL'):
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            else:
-                # On Windows, send SIGTERM again as fallback
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-        except ProcessLookupError:
-            pass
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
     def perplexity(self, args, cmd: list[str]):
         set_accel_env_vars()

@@ -8,7 +8,6 @@ from test.conftest import (
     skip_if_docker,
     skip_if_gh_actions_darwin,
     skip_if_no_container,
-    xfail_if_windows,
 )
 from test.e2e.utils import RamalamaExecWorkspace, check_output
 
@@ -291,7 +290,6 @@ def test_run_keepalive(shared_ctx_with_models, test_model):
 
 
 @pytest.mark.e2e
-@xfail_if_windows  # FIXME: image handling is broken on Windows?
 @skip_if_no_container
 @skip_if_docker
 @skip_if_gh_actions_darwin
@@ -329,7 +327,6 @@ def test_run_with_non_existing_images_new(shared_ctx_with_models, run_args, exit
 
 
 @pytest.mark.e2e
-@xfail_if_windows  # FIXME: image handling is broken on Windows?
 @skip_if_no_container
 @skip_if_darwin
 @skip_if_docker

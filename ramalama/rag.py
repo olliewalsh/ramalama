@@ -177,21 +177,9 @@ class RagTransport(OCI):
         args.rag = None
         super()._handle_container_chat(args, pid)
 
-    def _start_model(self, args, cmd: list[str]):
-        process = self.imodel._fork_and_serve(args, self.model_cmd)
-        if process:
-            # Wait for the process to complete (blocking)
-            exit_code = process.wait()
-            if exit_code != 0:
-                raise subprocess.CalledProcessError(
-                    exit_code,
-                    " ".join(cmd),
-                )
-        return process.pid if process else None
-
     def serve(self, args, cmd: list[str]):
         args.model_args.name = self.imodel.get_container_name(args.model_args)
-        process = self.imodel._fork_and_serve(args.model_args, self.model_cmd)
+        process = self.imodel.serve_nonblocking(args.model_args, self.model_cmd)
         if not args.dryrun:
             if process.wait() != 0:
                 raise subprocess.CalledProcessError(
@@ -202,8 +190,8 @@ class RagTransport(OCI):
 
     def run(self, args, cmd: list[str]):
         args.model_args.name = self.imodel.get_container_name(args.model_args)
-        process = self.imodel._fork_and_serve(args.model_args, self.model_cmd)
-        rag_process = self._fork_and_serve(args, cmd)
+        process = self.imodel.serve_nonblocking(args.model_args, self.model_cmd)
+        rag_process = self.serve_nonblocking(args, cmd)
         if not args.dryrun:
             if process.wait() != 0:
                 raise subprocess.CalledProcessError(

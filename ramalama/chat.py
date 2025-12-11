@@ -537,7 +537,6 @@ class ServerMonitor:
 
     def __init__(
         self,
-        server_pid=None,
         server_process=None,
         container_name=None,
         container_engine=None,
@@ -549,19 +548,17 @@ class ServerMonitor:
         Initialize the server monitor.
 
         Args:
-            server_pid: Process ID to monitor (for direct process monitoring)
-            server_process: subprocess.Popen object to monitor (preferred over server_pid)
+            server_process: subprocess.Popen object to monitor
             container_name: Container name to monitor (for container monitoring)
             container_engine: Container engine command (podman/docker)
             join_timeout: Seconds for thread join when stopping (default: 3.0)
             check_interval: Seconds between monitoring checks (default: 0.5)
             inspect_timeout: Seconds to wait for container inspect command to complete (default: 30.0)
 
-        Note: If neither server_pid/server_process nor container_name is provided, the monitor
+        Note: If neither server_process nor container_name is provided, the monitor
         operates in no-op mode (no actual monitoring occurs).
         """
         self.server_process = server_process
-        self.server_pid = server_pid if server_pid else (server_process.pid if server_process else None)
         self.container_name = container_name
         self.container_engine = container_engine
         self.timeout = join_timeout
@@ -573,8 +570,8 @@ class ServerMonitor:
         self._monitor_thread = None
 
         # Determine monitoring mode
-        if self.server_process or self.server_pid:
-            # Process monitoring using Popen object (preferred) or PID
+        if self.server_process:
+            # Process monitoring using Popen object
             self._mode = "process"
         elif container_name and container_engine:
             self._mode = "container"
@@ -622,12 +619,10 @@ class ServerMonitor:
         """Monitor the server process and report if it exits."""
         while not self._stop_event.is_set():
             try:
-                # Use Popen.poll() if we have the Popen object, otherwise use os.waitpid
-                # Use Popen.poll() for non-blocking check
                 exit_code = self.server_process.poll()
                 if exit_code is not None:
                     # Process has exited
-                    self._exit_info["pid"] = self.server_pid
+                    self._exit_info["pid"] = self.server_process.pid
                     self._exit_info["type"] = "exit"
                     self._exit_info["code"] = exit_code
                     self._exited_event.set()
