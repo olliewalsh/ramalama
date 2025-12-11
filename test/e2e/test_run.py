@@ -1,7 +1,7 @@
 import json
 import platform
 import re
-from subprocess import STDOUT, CalledProcessError, PIPE
+from subprocess import PIPE, STDOUT, CalledProcessError
 from test.conftest import (
     skip_if_container,
     skip_if_darwin,
@@ -113,7 +113,7 @@ def test_basic_dry_run():
         pytest.param(
             ["--name", "foobar"], r".*--temp 0.8", None, {
                 "RAMALAMA_CONFIG": "NUL" if platform.system() == "Windows" else '/dev/null'
-            }, True, None,  
+            }, True, None,
             id="check --temp default value is 0.8 with RAMALAMA_CONFIG=/dev/null", marks=skip_if_no_container,
         ),
         pytest.param(
@@ -161,7 +161,7 @@ def test_basic_dry_run():
             id="check --runtime-args", marks=skip_if_no_container
         ),
         pytest.param(
-            ["--runtime-args", "--foo='a b c'"], r".*--foo=a b c", None, None, True, None,  
+            ["--runtime-args", "--foo='a b c'"], r".*--foo=a b c", None, None, True, None,
             id="check --runtime-args=\"--foo='a b c'\"", marks=skip_if_no_container
         ),
         pytest.param(

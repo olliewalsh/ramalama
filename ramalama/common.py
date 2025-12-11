@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ctypes
 import glob
 import hashlib
 import json
@@ -123,7 +122,7 @@ def quoted(arr) -> str:
 
 def exec_cmd(args, stdout2null: bool = False, stderr2null: bool = False):
     logger.debug(f"exec_cmd: {quoted(args)}")
-    
+
     stdout_target = subprocess.DEVNULL if stdout2null else None
     stderr_target = subprocess.DEVNULL if stderr2null else None
     try:
@@ -132,6 +131,7 @@ def exec_cmd(args, stdout2null: bool = False, stderr2null: bool = False):
     except Exception as e:
         perror(f"Failed to execute {args[0]}: {e}")
         raise
+
 
 def run_cmd(args, cwd=None, stdout=subprocess.PIPE, ignore_stderr=False, ignore_all=False, encoding=None, env=None):
     """
@@ -321,11 +321,13 @@ def load_cdi_config(spec_dirs: list[str]) -> CDI_RETURN_TYPE | None:
                         continue
     return None
 
+
 def get_podman_machine_cdi_config() -> CDI_RETURN_TYPE | None:
     cdi_config = run_cmd(["podman", "machine", "ssh", "cat", "/etc/cdi/nvidia.yaml"], encoding="utf-8").stdout.strip()
     if cdi_config:
         return yaml.safe_load(cdi_config)
     return None
+
 
 def find_in_cdi(devices: list[str]) -> tuple[list[str], list[str]]:
     # Attempts to find a CDI configuration for each device in devices
@@ -362,7 +364,7 @@ def check_asahi() -> Literal["asahi"] | None:
     # /proc/device-tree is Linux-specific, skip on Windows
     if platform.system() == "Windows":
         return None
-    
+
     if os.path.exists('/proc/device-tree/compatible'):
         try:
             with open('/proc/device-tree/compatible', 'rb') as f:
@@ -493,7 +495,7 @@ def check_intel() -> Literal["intel"] | None:
     # /sys/bus/pci is Linux-specific, skip on Windows
     if platform.system() == "Windows":
         return None
-    
+
     intel_driver_glob_patterns = ["/sys/bus/pci/drivers/i915/*/device", "/sys/bus/pci/drivers/xe/*/device"]
     # Check to see if any of the device ids in intel_gpus are in the device id of the i915 / xe driver
     for fp in sorted([i for p in intel_driver_glob_patterns for i in glob.glob(p)]):

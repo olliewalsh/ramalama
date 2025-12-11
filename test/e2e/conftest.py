@@ -1,4 +1,3 @@
-import bcrypt
 import os
 import random
 import shutil
@@ -10,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from test.conftest import ramalama_container_engine
 
+import bcrypt
 import pytest
 
 

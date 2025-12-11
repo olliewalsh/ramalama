@@ -213,7 +213,9 @@ class TestMLXRuntime:
     @patch('ramalama.transports.base.Transport._fork_and_serve', return_value=MagicMock())
     @patch('ramalama.chat.chat')
     @patch('socket.socket')
-    def test_mlx_run_uses_server_client_model(self, mock_socket_class, mock_chat, mock_fork_and_serve,mock_machine, mock_system):
+    def test_mlx_run_uses_server_client_model(
+        self, mock_socket_class, mock_chat, mock_fork_and_serve, mock_machine, mock_system
+    ):
         """Test that MLX runtime uses server-client model in run method"""
         mock_system.return_value = "Darwin"
         mock_machine.return_value = "arm64"

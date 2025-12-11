@@ -1,7 +1,6 @@
 """utilities for working with AMDKFD driver"""
 
 import glob
-import sys
 import platform
 
 # Heap types in memory properties
@@ -26,7 +25,7 @@ def gpus():
     # /sys/devices/virtual/kfd is Linux-specific, skip on Windows
     if platform.system() == "Windows":
         return
-    
+
     for np in sorted(glob.glob('/sys/devices/virtual/kfd/kfd/topology/nodes/*')):
         props = parse_props(np + '/properties')
 

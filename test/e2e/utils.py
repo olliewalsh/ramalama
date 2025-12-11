@@ -41,7 +41,7 @@ class RamalamaExecWorkspace:
             self.environ["RAMALAMA_IN_CONTAINER"] = "True" if ramalama_container else "False"
         if container_engine_discover:
             self.environ["RAMALAMA_CONTAINER_ENGINE"] = ramalama_container_engine
-        
+
         # Update the environ with the extra env vars provided if any
         if env_vars:
             self.environ |= env_vars

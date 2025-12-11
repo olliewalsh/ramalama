@@ -196,7 +196,7 @@ class RagTransport(OCI):
             if process.wait() != 0:
                 raise subprocess.CalledProcessError(
                     process.returncode,
-                    " ".join(model_cmd),
+                    " ".join(self.model_cmd),
                 )
         super().serve(args, cmd)
 
@@ -213,7 +213,7 @@ class RagTransport(OCI):
             if processb.wait() != 0:
                 raise subprocess.CalledProcessError(
                     processb.returncode,
-                    " ".join(model_cmd),
+                    " ".join(self.model_cmd),
                 )
             return self._connect_and_chat(args, processb)
 

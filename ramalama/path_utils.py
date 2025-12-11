@@ -1,7 +1,6 @@
 """Utilities for cross-platform path handling, especially for Windows Docker/Podman support."""
 
 import os
-import sys
 import platform
 from pathlib import Path, PureWindowsPath
 
@@ -38,12 +37,14 @@ def normalize_host_path_for_container(host_path: str) -> str:
     # First, resolve symlinks and make the path absolute.
     path = Path(host_path).resolve()
 
-    # Handle UNC paths to container filesystem (e.g., \\wsl.localhost\podman-machine-default\home\user\.local\share\ramalama\store)
+    # Handle UNC paths to container filesystem
+    # e.g if the model store is placed on the podman machine VM to reduce copying
+    # \\wsl.localhost\podman-machine-default\home\user\.local\share\ramalama\store
     # NOTE: UNC paths cannot be accessed implicitly from the container, would need to smb mount
     if path.drive.startswith("\\\\"):
         return '/' + path.relative_to(path.drive).as_posix()
-    
-    if not path.drive :
+
+    if not path.drive:
         return path.as_posix()
 
     # Handle paths with drive letters

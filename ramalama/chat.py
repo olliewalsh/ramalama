@@ -636,7 +636,7 @@ class ServerMonitor:
                     break
             except Exception as e:
                 logger.debug(f"Error monitoring process: {e}")
-            
+
             # Use wait() instead of sleep() for responsive shutdown
             self._stop_event.wait(self.check_interval)
 

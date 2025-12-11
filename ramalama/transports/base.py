@@ -1,9 +1,9 @@
 import os
 import platform
-import sys
 import random
 import socket
 import subprocess
+import sys
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
@@ -397,7 +397,7 @@ class Transport(TransportBase):
     def _fork_and_serve(self, args, cmd: list[str]):
         if args.container:
             args.name = self.get_container_name(args)
-        
+
         # Use subprocess.Popen for all platforms
         # Prepare args for the server
         args.host = CONFIG.host
@@ -409,7 +409,7 @@ class Transport(TransportBase):
         if args.generate:
             self.generate_container_config(args, cmd)
             return
-        
+
         if args.container:
             # For container mode, set up the container and start it with subprocess
             self.setup_container(args)
@@ -420,7 +420,7 @@ class Transport(TransportBase):
             if args.dryrun:
                 self.engine.dryrun()
                 return
-            
+
             # Start the container using subprocess.Popen
             process = subprocess.Popen(
                 self.engine.exec_args,
@@ -449,7 +449,7 @@ class Transport(TransportBase):
         args.url = f"http://127.0.0.1:{args.port}/v1"
         if getattr(args, "runtime", None) == "mlx":
             args.prefix = "🍏 > "
-        
+
         if args.container:
             return self._handle_container_chat(args, server_process)
         else:
