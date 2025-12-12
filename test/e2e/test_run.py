@@ -313,7 +313,7 @@ def test_run_keepalive(shared_ctx_with_models, test_model):
                 "tiny",
             ],
             22,
-            r".*Error: quay.io/ramalama/testrag: image not known",
+            r".*quay.io/ramalama/testrag: image not known",
             id="non-existing-image-with-rag",
         ),
     ],
