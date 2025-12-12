@@ -408,7 +408,7 @@ class Transport(TransportBase):
 
         if args.generate:
             self.generate_container_config(args, cmd)
-            return
+            return None
 
         if args.container:
             # For container mode, set up the container and start it with subprocess
@@ -419,7 +419,7 @@ class Transport(TransportBase):
 
             if args.dryrun:
                 self.engine.dryrun()
-                return
+                return None
 
             # Start the container using subprocess.Popen
             process = subprocess.Popen(
@@ -429,7 +429,7 @@ class Transport(TransportBase):
         else:
             if args.dryrun:
                 dry_run(cmd)
-                return
+                return None
 
             # Non-container mode: run the command directly with subprocess
             process = subprocess.Popen(

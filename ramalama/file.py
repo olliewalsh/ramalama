@@ -31,7 +31,7 @@ class File:
 
     def __del__(self):
         if self.fd >= 0:
-            if platform.system() == "Windows":
+            if platform.system() != "Windows":
                 try:
                     # Unlock on Unix
                     fcntl.flock(self.fd, fcntl.LOCK_UN)

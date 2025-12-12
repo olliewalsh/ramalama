@@ -1,7 +1,6 @@
 import random
 import re
 from subprocess import STDOUT, CalledProcessError
-from test.conftest import xfail_if_windows
 from test.e2e.utils import check_output
 
 import pytest

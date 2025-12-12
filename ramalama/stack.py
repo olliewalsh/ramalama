@@ -1,6 +1,5 @@
 import os
 import platform
-import tempfile
 
 import ramalama.kube as kube
 import ramalama.quadlet as quadlet
@@ -64,7 +63,7 @@ class Stack:
         host_model_path = normalize_host_path_for_container(self.model._get_entry_model_path(False, False, False))
         if platform.system() == "Windows":
             #  Workaround https://github.com/containers/podman/issues/16704
-            host_model_path = '/mnt'+ host_model_path
+            host_model_path = '/mnt' + host_model_path
         volumes = f"""
       - hostPath:
           path: {host_model_path}
@@ -216,7 +215,9 @@ spec:
                 k.write(self.args.generate.output_dir)
                 return
 
-        with NamedTemporaryFile(mode='w', prefix='RamaLama_', delete=not self.args.debug, delete_on_close=False) as yaml_file:
+        with NamedTemporaryFile(
+            mode='w', prefix='RamaLama_', delete=not self.args.debug, delete_on_close=False
+        ) as yaml_file:
             yaml_file.write(yaml)
             yaml_file.close()
 
@@ -233,7 +234,9 @@ spec:
             exec_cmd(exec_args)
 
     def stop(self):
-        with NamedTemporaryFile(mode='w', prefix='RamaLama_', delete=not self.args.debug, delete_on_close=False) as yaml_file:
+        with NamedTemporaryFile(
+            mode='w', prefix='RamaLama_', delete=not self.args.debug, delete_on_close=False
+        ) as yaml_file:
             yaml_file.write(self.generate())
             yaml_file.close()
 

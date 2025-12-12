@@ -522,7 +522,7 @@ jobs:
         run: |
           Write-Host "Installing Podman on Windows..."
 
-          winget install --silent --exact --id RedHat.Podman
+          winget install --accept-source-agreements --silent --disable-interactivity --exact --id RedHat.Podman
 
           # TODO: remove when this just works https://github.com/microsoft/winget-cli/issues/549
           # Add Podman to PATH for current session
@@ -566,7 +566,7 @@ jobs:
       - name: Install OpenSSL
         shell: pwsh
         run: |
-          winget install --silent --exact --id ShiningLight.OpenSSL.Light
+          winget install --accept-source-agreements --silent --disable-interactivity --exact --id ShiningLight.OpenSSL.Light
 
           # Add OpenSSL to PATH for current session
           $opensslPath = "$env:ProgramFiles" + "\OpenSSL-Win64\bin"
