@@ -60,6 +60,8 @@ from ramalama.version import print_version, version
 shortnames = Shortnames()
 
 GENERATE_OPTIONS = ["quadlet", "kube", "quadlet/kube", "compose"]
+LIST_SORT_FIELD_OPTIONS = ["size", "modified", "name"]
+LIST_SORT_ORDER_OPTIONS = ["desc", "asc"]
 
 
 class ParsedGenerateInput:
@@ -524,6 +526,20 @@ def list_parser(subparsers):
     parser.add_argument("--all", dest="all", action="store_true", help="include partially downloaded AI Models")
     parser.add_argument("--json", dest="json", action="store_true", help="print using json")
     parser.add_argument("-n", "--noheading", dest="noheading", action="store_true", help="do not display heading")
+    parser.add_argument(
+        "--sort",
+        dest="sort",
+        choices=LIST_SORT_FIELD_OPTIONS,
+        default="name",
+        help="field used to sort the AI Models",
+    )
+    parser.add_argument(
+        "--order",
+        dest="order",
+        choices=LIST_SORT_ORDER_OPTIONS,
+        default="desc",
+        help="order used to sort the AI Models",
+    )
     parser.set_defaults(func=list_cli)
 
 
@@ -544,6 +560,7 @@ def _list_models_from_store(args):
     ret = []
     local_timezone = datetime.now().astimezone().tzinfo
 
+    # map the listed models to the proper output structure for display
     for model, files in models.items():
         is_partially_downloaded = any(file.is_partial for file in files)
         if not args.all and is_partially_downloaded:
@@ -563,6 +580,9 @@ def _list_models_from_store(args):
                 "size": size_sum,
             }
         )
+
+    # sort the listed models according to the desired order
+    ret.sort(key=lambda entry: entry[args.sort], reverse=args.order == "desc")
 
     return ret
 
@@ -714,11 +734,12 @@ def convert_parser(subparsers):
     )
     parser.add_argument(
         "--type",
-        default="raw",
-        choices=["car", "raw"],
+        default=CONFIG.convert_type,
+        choices=["artifact", "car", "raw"],
         help="""\
 type of OCI Model Image to push.
 
+Model "artifact" stores the AI Model as an OCI Artifact.
 Model "car" includes base image with the model stored in a /models subdir.
 Model "raw" contains the model and a link file model.file to it stored at /.""",
     )
@@ -755,11 +776,12 @@ def push_parser(subparsers):
     add_network_argument(parser)
     parser.add_argument(
         "--type",
-        default="raw",
-        choices=["car", "raw"],
+        default=CONFIG.convert_type,
+        choices=["artifact", "car", "raw"],
         help="""\
 type of OCI Model Image to push.
 
+Model "artifact" stores the AI Model as an OCI Artifact.
 Model "car" includes base image with the model stored in a /models subdir.
 Model "raw" contains the model and a link file model.file to it stored at /.""",
     )
@@ -774,10 +796,12 @@ Model "raw" contains the model and a link file model.file to it stored at /.""",
     parser.set_defaults(func=push_cli)
 
 
-def _get_source_model(args):
+def _get_source_model(args, transport=None):
     src = shortnames.resolve(args.SOURCE)
-    smodel = New(src, args)
+    smodel = New(src, args, transport=transport)
     if smodel.type == "OCI":
+        if not args.TARGET:
+            return smodel
         raise ValueError(f"converting from an OCI based image {src} is not supported")
     if not smodel.exists() and not args.dryrun:
         smodel.pull(args)
@@ -785,8 +809,12 @@ def _get_source_model(args):
 
 
 def push_cli(args):
-    source_model = _get_source_model(args)
     target = args.SOURCE
+    transport = None
+    if not args.TARGET:
+        transport = "oci"
+    source_model = _get_source_model(args, transport=transport)
+
     if args.TARGET:
         target = shortnames.resolve(args.TARGET)
     target_model = New(target, args)
@@ -1169,9 +1197,14 @@ def serve_cli(args):
         model.ensure_model_exists(args)
     except KeyError as e:
         try:
+            if "://" in args.MODEL:
+                raise e
             args.quiet = True
             model = TransportFactory(args.MODEL, args, ignore_stderr=True).create_oci()
             model.ensure_model_exists(args)
+            # Since this is a OCI model, prepend oci://
+            args.MODEL = f"oci://{args.MODEL}"
+
         except Exception:
             raise e
 
@@ -1412,27 +1445,42 @@ def rm_parser(subparsers):
     parser.set_defaults(func=rm_cli)
 
 
+def _rm_oci_model(model, args) -> bool:
+    # attempt to remove as a container image
+    try:
+        m = TransportFactory(model, args, ignore_stderr=True).create_oci()
+        return m.remove(args)
+    except Exception:
+        return False
+
+
 def _rm_model(models, args):
+    exceptions = []
     for model in models:
         model = shortnames.resolve(model)
 
         try:
             m = New(model, args)
-            m.remove(args)
-        except KeyError as e:
+            if m.remove(args):
+                continue
+            # Failed to remove and might be OCI so attempt to remove OCI
+            if args.ignore:
+                _rm_oci_model(model, args)
+                continue
+        except (KeyError, subprocess.CalledProcessError) as e:
             for prefix in MODEL_TYPES:
                 if model.startswith(prefix + "://"):
                     if not args.ignore:
                         raise e
-            try:
-                # attempt to remove as a container image
-                m = TransportFactory(model, args, ignore_stderr=True).create_oci()
-                m.remove(args)
-                return
-            except Exception:
-                pass
-            if not args.ignore:
-                raise e
+            # attempt to remove as a container image
+            if _rm_oci_model(model, args) or args.ignore:
+                continue
+            exceptions.append(e)
+
+    if len(exceptions) > 0:
+        for exception in exceptions[1:]:
+            perror("Error: " + str(exception).strip("'\""))
+        raise exceptions[0]
 
 
 def rm_cli(args):
@@ -1492,7 +1540,7 @@ def inspect_parser(subparsers):
 def inspect_cli(args):
     args.pull = "never"
     model = New(args.MODEL, args)
-    model.inspect(args.all, args.get == "all", args.get, args.json, args.dryrun)
+    print(model.inspect(args.all, args.get == "all", args.get, args.json, args.dryrun))
 
 
 def main() -> None:
@@ -1524,9 +1572,11 @@ def main() -> None:
         args.func(args)
     except urllib.error.HTTPError as e:
         eprint(f"pulling {e.geturl()} failed: {e}", errno.EINVAL)
+    except FileNotFoundError as e:
+        eprint(e, errno.ENOENT)
     except HelpException:
         parser.print_help()
-    except (ConnectionError, IndexError, KeyError, ValueError, NoRefFileFound) as e:
+    except (IsADirectoryError, ConnectionError, IndexError, KeyError, ValueError, NoRefFileFound) as e:
         eprint(e, errno.EINVAL)
     except NotImplementedError as e:
         eprint(e, errno.ENOSYS)

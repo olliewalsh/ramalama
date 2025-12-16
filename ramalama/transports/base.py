@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from abc import ABC, abstractmethod
+from functools import cached_property
 from typing import Any, Dict, Optional
 
 import ramalama.chat as chat
@@ -100,7 +101,7 @@ class TransportBase(ABC):
         raise self.__not_implemented_error("push")
 
     @abstractmethod
-    def remove(self, args):
+    def remove(self, args) -> bool:
         raise self.__not_implemented_error("rm")
 
     @abstractmethod
@@ -153,6 +154,10 @@ class Transport(TransportBase):
         self.default_image = accel_image(CONFIG)
         self.draft_model: Transport | None = None
 
+    @cached_property
+    def artifact(self) -> bool:
+        return self.is_artifact()
+
     def extract_model_identifiers(self):
         model_name = self.model
         model_tag = "latest"
@@ -202,6 +207,13 @@ class Transport(TransportBase):
 
         if self.model_type == 'oci':
             if use_container or should_generate:
+                if getattr(self, "artifact", False):
+                    artifact_name_method = getattr(self, "artifact_name", None)
+                    if artifact_name_method:
+                        try:
+                            return f"{MNT_DIR}/{artifact_name_method()}"
+                        except subprocess.CalledProcessError:
+                            pass
                 return f"{MNT_DIR}/model.file"
             else:
                 return f"oci://{self.model}"
@@ -291,10 +303,13 @@ class Transport(TransportBase):
             return f"{MNT_DIR}/{chat_template_file.name}"
         return self.model_store.get_blob_file_path(chat_template_file.hash)
 
-    def remove(self, args):
+    def remove(self, args) -> bool:
         _, tag, _ = self.extract_model_identifiers()
-        if not self.model_store.remove_snapshot(tag) and not args.ignore:
+        if self.model_store.remove_snapshot(tag):
+            return True
+        if not args.ignore:
             raise KeyError(f"Model '{self.model}' not found")
+        return False
 
     def get_container_name(self, args):
         if getattr(args, "name", None):
@@ -347,9 +362,10 @@ class Transport(TransportBase):
     def setup_mounts(self, args):
         if args.dryrun:
             return
+
         if self.model_type == 'oci':
             if self.engine.use_podman:
-                mount_cmd = f"--mount=type=image,src={self.model},destination={MNT_DIR},subpath=/models,rw=false"
+                mount_cmd = self.mount_cmd()
             elif self.engine.use_docker:
                 output_filename = self._get_entry_model_path(args.container, True, args.dryrun)
                 volume = populate_volume_from_image(self, args, os.path.basename(output_filename))
@@ -390,39 +406,60 @@ class Transport(TransportBase):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
 
-        args.noout = not args.debug
+        process = self.serve_nonblocking(args, server_cmd)
+        if process:
+            return self._connect_and_chat(args, process)
 
-        pid = self._fork_and_serve(args, server_cmd)
-        if pid:
-            return self._connect_and_chat(args, pid)
-
-    def _fork_and_serve(self, args, cmd: list[str]):
+    def serve_nonblocking(self, args, cmd: list[str]) -> subprocess.Popen | None:
         if args.container:
             args.name = self.get_container_name(args)
-        pid = os.fork()
-        if pid == 0:
-            # Child process - start the server
-            self._start_server(args, cmd)
-        return pid
 
-    def _start_server(self, args, cmd: list[str]):
-        """Start the server in the child process."""
+        # Use subprocess.Popen for all platforms
+        # Prepare args for the server
         args.host = CONFIG.host
-        args.generate = ""
         args.detach = True
-        self.serve(args, cmd)
 
-    def _connect_and_chat(self, args, server_pid):
+        set_accel_env_vars()
+
+        if args.container:
+            # For container mode, set up the container and start it with subprocess
+            self.setup_container(args)
+            self.setup_mounts(args)
+            # Make sure Image precedes cmd_args
+            self.engine.add([args.image] + cmd)
+
+            if args.dryrun:
+                self.engine.dryrun()
+                return None
+
+            # Start the container using subprocess.Popen
+            process = subprocess.Popen(
+                self.engine.exec_args,
+            )
+            return process
+
+        # Non-container mode: run the command directly with subprocess
+        if args.dryrun:
+            dry_run(cmd)
+            return None
+
+        process = subprocess.Popen(
+            cmd,
+        )
+        return process
+
+    def _connect_and_chat(self, args, server_process):
         """Connect to the server and start chat in the parent process."""
         args.url = f"http://127.0.0.1:{args.port}/v1"
         if getattr(args, "runtime", None) == "mlx":
             args.prefix = "🍏 > "
-        args.pid2kill = ""
 
         if args.container:
-            return self._handle_container_chat(args, server_pid)
+            return self._handle_container_chat(args, server_process)
         else:
-            args.pid2kill = server_pid
+            # Store the Popen object for monitoring
+            args.server_process = server_process
+
             if getattr(args, "runtime", None) == "mlx":
                 return self._handle_mlx_chat(args)
             chat.chat(args)
@@ -434,10 +471,11 @@ class Transport(TransportBase):
     def wait_for_healthy(self, args):
         wait_for_healthy(args, is_healthy)
 
-    def _handle_container_chat(self, args, server_pid):
+    def _handle_container_chat(self, args, server_process):
         """Handle chat for container-based execution."""
-        _, status = os.waitpid(server_pid, 0)
-        if status != 0:
+        # Wait for the server process to complete (blocking)
+        exit_code = server_process.wait()
+        if exit_code != 0:
             raise ValueError(f"Failed to serve model {self.model_name}, for ramalama run command")
 
         if not args.dryrun:
@@ -480,7 +518,7 @@ class Transport(TransportBase):
             except Exception as e:
                 if i >= max_retries - 1:
                     perror(f"Error: Failed to connect to MLX server after {max_retries} attempts: {e}")
-                    self._cleanup_server_process(args.pid2kill)
+                    self._cleanup_server_process(args.server_process)
                     raise e
                 logger.debug(f"Connection attempt failed, retrying... (attempt {i + 1}/{max_retries}): {e}")
                 time.sleep(3)
@@ -498,32 +536,16 @@ class Transport(TransportBase):
         except (socket.error, ValueError):
             return False
 
-    def _cleanup_server_process(self, pid):
+    def _cleanup_server_process(self, process):
         """Clean up the server process."""
-        if not pid:
+        if not process:
             return
 
-        import signal
-
+        process.terminate()
         try:
-            # Try graceful termination first
-            os.kill(pid, signal.SIGTERM)
-            time.sleep(1)  # Give it time to terminate gracefully
-
-            # Force kill if still running (SIGKILL is Unix-only)
-            if hasattr(signal, 'SIGKILL'):
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            else:
-                # On Windows, send SIGTERM again as fallback
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-        except ProcessLookupError:
-            pass
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
     def perplexity(self, args, cmd: list[str]):
         set_accel_env_vars()
@@ -588,7 +610,7 @@ class Transport(TransportBase):
             )
         elif args.generate.gen_type == "kube":
             self.kube(
-                (model_src_path, model_dest_path),
+                (model_src_path.removeprefix("oci://"), model_dest_path),
                 (chat_template_src_path, chat_template_dest_path),
                 (mmproj_src_path, mmproj_dest_path),
                 args,
@@ -636,22 +658,28 @@ class Transport(TransportBase):
             self.generate_container_config(args, cmd)
             return
 
-        self.execute_command(cmd, args)
+        try:
+            self.execute_command(cmd, args)
+        except Exception as e:
+            self._cleanup_server_process(args.server_process)
+            raise e
 
     def quadlet(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
-        quadlet = Quadlet(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
+        quadlet = Quadlet(
+            self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact
+        )
         for generated_file in quadlet.generate():
             generated_file.write(output_dir)
 
     def quadlet_kube(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
-        kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
+        kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact)
         kube.generate().write(output_dir)
 
-        quadlet = Quadlet(kube.name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
+        quadlet = Quadlet(kube.name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact)
         quadlet.kube().write(output_dir)
 
     def kube(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
-        kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args)
+        kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact)
         kube.generate().write(output_dir)
 
     def compose(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
@@ -671,40 +699,38 @@ class Transport(TransportBase):
         get_field: str = "",
         as_json: bool = False,
         dryrun: bool = False,
-    ) -> None:
+    ) -> Any:
         model_name = self.filename
         model_registry = self.type.lower()
         model_path = self._get_inspect_model_path(dryrun)
-
         if GGUFInfoParser.is_model_gguf(model_path):
             if not show_all_metadata and get_field == "":
                 gguf_info: GGUFModelInfo = GGUFInfoParser.parse(model_name, model_registry, model_path)
-                print(gguf_info.serialize(json=as_json, all=show_all))
-                return
+                return gguf_info.serialize(json=as_json, all=show_all)
 
             metadata = GGUFInfoParser.parse_metadata(model_path)
             if show_all_metadata:
-                print(metadata.serialize(json=as_json))
-                return
+                return metadata.serialize(json=as_json)
             elif get_field != "":  # If a specific field is requested, print only that field
                 field_value = metadata.get(get_field)
                 if field_value is None:
                     raise KeyError(f"Field '{get_field}' not found in GGUF model metadata")
-                print(field_value)
-                return
+                return field_value
 
         if SafetensorInfoParser.is_model_safetensor(model_name):
             safetensor_info: SafetensorModelInfo = SafetensorInfoParser.parse(model_name, model_registry, model_path)
-            print(safetensor_info.serialize(json=as_json, all=show_all))
-            return
+            return safetensor_info.serialize(json=as_json, all=show_all)
 
-        print(ModelInfoBase(model_name, model_registry, model_path).serialize(json=as_json))
+        return ModelInfoBase(model_name, model_registry, model_path).serialize(json=as_json)
 
-    def print_pull_message(self, model_name):
+    def print_pull_message(self, model_name) -> None:
         model_name = trim_model_name(model_name)
         # Write messages to stderr
         perror(f"Downloading {model_name} ...")
         perror(f"Trying to pull {model_name} ...")
+
+    def is_artifact(self) -> bool:
+        return False
 
 
 def compute_ports(exclude: list[str] | None = None) -> list[int]:
