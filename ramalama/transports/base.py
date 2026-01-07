@@ -7,7 +7,10 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from ramalama.chat import ChatOperationalArgs
 
 import ramalama.chat as chat
 from ramalama.common import (
@@ -109,7 +112,7 @@ class TransportBase(ABC):
         raise self.__not_implemented_error("bench")
 
     @abstractmethod
-    def run(self, args, server_cmd: list[str]):
+    def run(self, args, cmd: list[str]):
         raise self.__not_implemented_error("run")
 
     @abstractmethod
@@ -196,6 +199,55 @@ class Transport(TransportBase):
             name, _, orga = self.extract_model_identifiers()
             self._model_store = ModelStore(GlobalModelStore(self._model_store_path), name, self.model_type, orga)
         return self._model_store
+
+    def _get_all_model_part_paths(
+        self, use_container: bool, should_generate: bool, dry_run: bool
+    ) -> list[tuple[str, str]]:
+        """
+        Returns a list of (src_path, dest_path) tuples for all parts of a model.
+        For single-file models, returns a list with one tuple.
+        For multi-part models, returns a tuple for each part.
+        """
+        if dry_run:
+            return [("/path/to/model", f"{MNT_DIR}/model.file")]
+
+        if self.model_type == 'oci':
+            # OCI models don't use this path for multi-part handling
+            entry_path_src = self._get_entry_model_path(False, False, False)
+            entry_path_dest = self._get_entry_model_path(True, True, False)
+            return [(entry_path_src, entry_path_dest)]
+
+        ref_file = self.model_store.get_ref_file(self.model_tag)
+        if ref_file is None:
+            raise NoRefFileFound(self.model)
+
+        gguf_files = ref_file.model_files
+        safetensor_files = ref_file.safetensor_model_files
+        if safetensor_files:
+            # Safetensor models use directory mounts, not individual files
+            src_path = self.model_store.get_snapshot_directory_from_tag(self.model_tag)
+            if use_container or should_generate:
+                dest_path = MNT_DIR
+            else:
+                dest_path = src_path
+            return [(src_path, dest_path)]
+        elif not gguf_files:
+            raise NoGGUFModelFileFound()
+
+        model_parts = []
+        for model_file in gguf_files:
+            if use_container or should_generate:
+                dest_path = f"{MNT_DIR}/{model_file.name}"
+            else:
+                dest_path = self.model_store.get_blob_file_path(model_file.hash)
+            src_path = self.model_store.get_blob_file_path(model_file.hash)
+            model_parts.append((src_path, dest_path))
+
+        # Sort multi-part models by filename to ensure correct order
+        if len(model_parts) > 1 and any("-00001-of-" in name for _, name in model_parts):
+            model_parts.sort(key=lambda x: x[1])
+
+        return model_parts
 
     def _get_entry_model_path(self, use_container: bool, should_generate: bool, dry_run: bool) -> str:
         """
@@ -402,11 +454,11 @@ class Transport(TransportBase):
         set_accel_env_vars()
         self.execute_command(cmd, args)
 
-    def run(self, args, server_cmd: list[str]):
+    def run(self, args, cmd: list[str]):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
 
-        process = self.serve_nonblocking(args, server_cmd)
+        process = self.serve_nonblocking(args, cmd)
         if process:
             return self._connect_and_chat(args, process)
 
@@ -465,7 +517,7 @@ class Transport(TransportBase):
             chat.chat(args)
             return 0
 
-    def chat_operational_args(self, args):
+    def chat_operational_args(self, args) -> "ChatOperationalArgs | None":
         return None
 
     def wait_for_healthy(self, args):
@@ -599,6 +651,9 @@ class Transport(TransportBase):
         chat_template_dest_path = self._get_chat_template_path(True, True, args.dryrun)
         mmproj_dest_path = self._get_mmproj_path(True, True, args.dryrun)
 
+        # Get all model parts (for multi-part models)
+        model_parts = self._get_all_model_part_paths(False, True, args.dryrun)
+
         if args.generate.gen_type == "quadlet":
             self.quadlet(
                 (model_src_path, model_dest_path),
@@ -607,6 +662,7 @@ class Transport(TransportBase):
                 args,
                 exec_args,
                 args.generate.output_dir,
+                model_parts,
             )
         elif args.generate.gen_type == "kube":
             self.kube(
@@ -625,6 +681,7 @@ class Transport(TransportBase):
                 args,
                 exec_args,
                 args.generate.output_dir,
+                model_parts,
             )
         elif args.generate.gen_type == "compose":
             self.compose(
@@ -664,18 +721,22 @@ class Transport(TransportBase):
             self._cleanup_server_process(args.server_process)
             raise e
 
-    def quadlet(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
+    def quadlet(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir, model_parts=None):
         quadlet = Quadlet(
-            self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact
+            self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact, model_parts
         )
         for generated_file in quadlet.generate():
             generated_file.write(output_dir)
 
-    def quadlet_kube(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
+    def quadlet_kube(
+        self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir, model_parts=None
+    ):
         kube = Kube(self.model_name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact)
         kube.generate().write(output_dir)
 
-        quadlet = Quadlet(kube.name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact)
+        quadlet = Quadlet(
+            kube.name, model_paths, chat_template_paths, mmproj_paths, args, exec_args, self.artifact, model_parts
+        )
         quadlet.kube().write(output_dir)
 
     def kube(self, model_paths, chat_template_paths, mmproj_paths, args, exec_args, output_dir):
@@ -734,8 +795,12 @@ class Transport(TransportBase):
 
 
 def compute_ports(exclude: list[str] | None = None) -> list[int]:
-    excluded = exclude and set(map(int, exclude)) or set()
-    ports = list(sorted(set(range(DEFAULT_PORT_RANGE[0], DEFAULT_PORT_RANGE[1] + 1)) - excluded))
+    excluded = set() if exclude is None else set(map(int, exclude))
+    ports = [p for p in range(DEFAULT_PORT_RANGE[0], DEFAULT_PORT_RANGE[1] + 1) if p not in excluded]
+
+    if not ports:
+        raise ValueError("All ports in the DEFAULT_PORT_RANGE were exhausted by the exclusion list.")
+
     first_port = ports.pop(0)
     random.shuffle(ports)
     # try always the first port before the randomized others
