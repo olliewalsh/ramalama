@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import Optional
+from typing import Optional, Union
 
 from ramalama.common import check_metal, check_nvidia
 from ramalama.console import should_colorize
@@ -54,12 +54,12 @@ class RamalamaArgsContext:
 class RamalamaRagGenArgsContext:
 
     def __init__(self) -> None:
-        self.debug: bool | None = None
-        self.format: str | None = None
-        self.ocr: bool | None = None
-        self.inputdir: str | None = None
-        self.paths: list[str] | None = None
-        self.urls: list[str] | None = None
+        self.debug: Optional[bool] = None
+        self.format: Optional[str] = None
+        self.ocr: Optional[bool] = None
+        self.inputdir: Optional[str] = None
+        self.paths: Optional[list[str]] = None
+        self.urls: Optional[list[str]] = None
 
     @staticmethod
     def from_argparse(args: argparse.Namespace) -> "RamalamaRagGenArgsContext":
@@ -76,10 +76,10 @@ class RamalamaRagGenArgsContext:
 class RamalamaRagArgsContext:
 
     def __init__(self) -> None:
-        self.debug: bool | None = None
-        self.port: str | None = None
-        self.model_host: str | None = None
-        self.model_port: str | None = None
+        self.debug: Optional[bool] = None
+        self.port: Optional[str] = None
+        self.model_host: Optional[str] = None
+        self.model_port: Optional[str] = None
 
     @staticmethod
     def from_argparse(args: argparse.Namespace) -> "RamalamaRagArgsContext":
@@ -143,8 +143,8 @@ class RamalamaCommandContext:
 
     def __init__(
         self,
-        args: RamalamaArgsContext | RamalamaRagGenArgsContext | RamalamaRagArgsContext,
-        model: RamalamaModelContext | None,
+        args: Union[RamalamaArgsContext, RamalamaRagGenArgsContext, RamalamaRagArgsContext],
+        model: Optional[RamalamaModelContext],
         host: RamalamaHostContext,
     ):
         self.args = args

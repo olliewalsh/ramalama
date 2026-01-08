@@ -1,7 +1,7 @@
 import io
 import struct
 from enum import IntEnum
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, Union
 
 from ramalama.endian import GGUFEndian
 from ramalama.logger import logger
@@ -135,7 +135,7 @@ class GGUFInfoParser:
         return raw.decode("utf-8")
 
     @staticmethod
-    def read_number(model: io.BufferedReader, value_type: GGUFValueType, model_endianness: GGUFEndian) -> float | int:
+    def read_number(model: io.BufferedReader, value_type: GGUFValueType, model_endianness: GGUFEndian) -> Union[float, int]:
         if value_type not in GGUF_NUMBER_FORMATS:
             raise ParseError(f"Value type '{value_type}' not in format dict")
 
@@ -160,7 +160,7 @@ class GGUFInfoParser:
     @staticmethod
     def read_value(
         model: io.BufferedReader, value_type: GGUFValueType, model_endianness: GGUFEndian
-    ) -> str | int | float | bool | list:
+    ) -> Union[str, int, float, bool, list]:
         value: Any
         if value_type in GGUF_NUMBER_FORMATS:
             value = GGUFInfoParser.read_number(model, value_type, model_endianness)

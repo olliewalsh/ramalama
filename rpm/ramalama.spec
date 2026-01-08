@@ -8,9 +8,9 @@
 
 %global _python_dist_allow_version_zero 1
 
-%if 0%{?el9}
-%global python3_pkgversion 3.12
-%endif
+#%if 0%{?el9}
+#%global python3_pkgversion 3.12
+#%endif
 
 Name:             %{pypi_name}
 # DO NOT TOUCH the Version string!

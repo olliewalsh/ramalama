@@ -5,6 +5,7 @@ import shutil
 import sys
 import time
 import urllib.request
+from typing import Optional
 
 import ramalama.console as console
 from ramalama.common import perror
@@ -162,7 +163,7 @@ class HttpClient:
         return now_downloaded / elapsed_seconds
 
 
-def download_file(url: str, dest_path: str, headers: dict[str, str] | None = None, show_progress: bool = True):
+def download_file(url: str, dest_path: str, headers: Optional[dict[str, str]] = None, show_progress: bool = True):
     """
     Downloads a file from a given URL to a specified destination path.
 

@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import copy
 from collections.abc import Callable
-from typing import TypeAlias
+from typing import TYPE_CHECKING, Union
+if TYPE_CHECKING:
+    from typing import TypeAlias
 from urllib.parse import urlparse
 
 from ramalama.arg_types import StoreArgType
@@ -14,7 +18,7 @@ from ramalama.transports.ollama import Ollama
 from ramalama.transports.rlcr import RamalamaContainerRegistry
 from ramalama.transports.url import URL
 
-CLASS_MODEL_TYPES: TypeAlias = Huggingface | Ollama | OCI | URL | ModelScope | RamalamaContainerRegistry
+CLASS_MODEL_TYPES: TypeAlias = Union[Huggingface, Ollama, OCI, URL, ModelScope, RamalamaContainerRegistry]
 
 
 class TransportFactory:

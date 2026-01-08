@@ -1,5 +1,5 @@
 from dataclasses import make_dataclass
-from typing import List, Protocol, get_type_hints
+from typing import List, Protocol, get_type_hints, Optional, Union
 
 from ramalama.config import COLOR_OPTIONS, SUPPORTED_ENGINES, SUPPORTED_RUNTIMES, PathStr
 
@@ -11,21 +11,21 @@ def protocol_to_dataclass(proto_cls):
 
 
 class EngineArgType(Protocol):
-    engine: SUPPORTED_ENGINES | None
+    engine: Optional[SUPPORTED_ENGINES]
 
 
 EngineArgs = protocol_to_dataclass(EngineArgType)
 
 
 class ContainerArgType(Protocol):
-    container: bool | None
+    container: Optional[bool]
 
 
 ContainerArgs = protocol_to_dataclass(ContainerArgType)
 
 
 class StoreArgType(Protocol):
-    engine: SUPPORTED_ENGINES | None
+    engine: Optional[SUPPORTED_ENGINES]
     container: bool
     store: str
 
@@ -42,18 +42,18 @@ class BaseEngineArgsType(Protocol):
     quiet: bool
     image: str
     # Optional attributes (accessed via getattr)
-    pull: str | None
-    network: str | None
-    oci_runtime: str | None
-    selinux: bool | None
-    nocapdrop: bool | None
-    device: list[str] | None
-    podman_keep_groups: bool | None
+    pull: Optional[str]
+    network: Optional[str]
+    oci_runtime: Optional[str]
+    selinux: Optional[bool]
+    nocapdrop: Optional[bool]
+    device: Optional[list[str]]
+    podman_keep_groups: Optional[bool]
     # Optional attributes for labels
-    MODEL: str | None
-    runtime: str | None
-    port: str | int | None  # Can be string (e.g., "8080:8080") or int
-    subcommand: str | None
+    MODEL: Optional[str]
+    runtime: Optional[str]
+    port: Union[str, int]  # Can be string (e.g., "8080:8080") or int
+    subcommand: Optional[str]
 
 
 BaseEngineArgs = protocol_to_dataclass(BaseEngineArgsType)
@@ -67,7 +67,7 @@ class DefaultArgsType(Protocol):
     quiet: bool
     dryrun: bool
     engine: SUPPORTED_ENGINES
-    noout: bool | None
+    noout: Optional[bool]
 
 
 DefaultArgs = protocol_to_dataclass(DefaultArgsType)
@@ -78,45 +78,45 @@ class ChatSubArgsType(Protocol):
     url: str
     color: COLOR_OPTIONS
     list: bool
-    model: str | None
-    rag: str | None
-    api_key: str | None
-    ARGS: List[str] | None
+    model: Optional[str]
+    rag: Optional[str]
+    api_key: Optional[str]
+    ARGS: Optional[List[str]]
 
 
 ChatSubArgs = protocol_to_dataclass(ChatSubArgsType)
 
 
 class ChatArgsType(DefaultArgsType, ChatSubArgsType):
-    ignore: bool | None  # runtime-only
+    ignore: Optional[bool]  # runtime-only
 
 
 class ServeRunArgsType(DefaultArgsType, Protocol):
     """Args for serve and run commands"""
 
     MODEL: str
-    port: int | None
-    name: str | None
-    rag: str | None
+    port: Optional[int]
+    name: Optional[str]
+    rag: Optional[str]
     subcommand: str
-    detach: bool | None
-    api: str | None
+    detach: Optional[bool]
+    api: Optional[str]
     image: str
-    host: str | None
-    generate: str | None
+    host: Optional[str]
+    generate: Optional[str]
     context: int
     cache_reuse: int
-    authfile: str | None
-    device: list[str] | None
+    authfile: Optional[str]
+    device: Optional[list[str]]
     env: list[str]
-    ARGS: list[str] | None  # For run command
-    mcp: list[str] | None
+    ARGS: Optional[list[str]]  # For run command
+    mcp: Optional[list[str]]
     summarize_after: int
     # Chat/run specific options
     color: COLOR_OPTIONS
     prefix: str
-    rag_image: str | None
-    ignore: bool | None  # runtime-only
+    rag_image: Optional[str]
+    ignore: Optional[bool]  # runtime-only
 
 
 ServeRunArgs = protocol_to_dataclass(ServeRunArgsType)

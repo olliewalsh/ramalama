@@ -9,14 +9,14 @@ import sys
 import urllib.error
 from datetime import datetime, timezone
 from textwrap import dedent
-from typing import Any, get_args
+from typing import Any, get_args, Optional, Union
 from urllib.parse import urlparse
 
 # if autocomplete doesn't exist, just do nothing, don't break
 try:
     import argcomplete
 
-    suppressCompleter: type[argcomplete.completers.SuppressCompleter] | None = argcomplete.completers.SuppressCompleter
+    suppressCompleter: Optional[type[argcomplete.completers.SuppressCompleter]] = argcomplete.completers.SuppressCompleter
 except Exception:
     suppressCompleter = None
 
@@ -481,7 +481,7 @@ def bench_cli(args):
     model.bench(args, assemble_command(args))
 
 
-def add_network_argument(parser, dflt: str | None = "none"):
+def add_network_argument(parser, dflt: Optional[str] = "none"):
     # Disable network access by default, and give the option to pass any supported network mode into
     # podman if needed:
     # https://docs.podman.io/en/latest/markdown/podman-run.1.html#network-mode-net
@@ -1560,7 +1560,7 @@ def inspect_cli(args):
 
 
 def main() -> None:
-    def eprint(e: Exception | str, exit_code: int):
+    def eprint(e: Union[Exception, str], exit_code: int):
         try:
             if args.debug:
                 logger.exception(e)

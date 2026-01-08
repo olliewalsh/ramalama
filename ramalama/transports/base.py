@@ -155,7 +155,7 @@ class Transport(TransportBase):
         self._model_store: Optional[ModelStore] = None
 
         self.default_image = accel_image(CONFIG)
-        self.draft_model: Transport | None = None
+        self.draft_model: Optional[Transport] = None
 
     @cached_property
     def artifact(self) -> bool:
@@ -462,7 +462,7 @@ class Transport(TransportBase):
         if process:
             return self._connect_and_chat(args, process)
 
-    def serve_nonblocking(self, args, cmd: list[str]) -> subprocess.Popen | None:
+    def serve_nonblocking(self, args, cmd: list[str]) -> Optional[subprocess.Popen]:
         if args.container:
             args.name = self.get_container_name(args)
 
@@ -517,7 +517,7 @@ class Transport(TransportBase):
             chat.chat(args)
             return 0
 
-    def chat_operational_args(self, args) -> "ChatOperationalArgs | None":
+    def chat_operational_args(self, args) -> Optional["ChatOperationalArgs"]:
         return None
 
     def wait_for_healthy(self, args):
@@ -794,7 +794,7 @@ class Transport(TransportBase):
         return False
 
 
-def compute_ports(exclude: list[str] | None = None) -> list[int]:
+def compute_ports(exclude: Optional[list[str]] = None) -> list[int]:
     excluded = set() if exclude is None else set(map(int, exclude))
     ports = [p for p in range(DEFAULT_PORT_RANGE[0], DEFAULT_PORT_RANGE[1] + 1) if p not in excluded]
 
@@ -807,7 +807,7 @@ def compute_ports(exclude: list[str] | None = None) -> list[int]:
     return [first_port] + ports
 
 
-def get_available_port_if_any(exclude: list[str] | None = None) -> int:
+def get_available_port_if_any(exclude: Optional[list[str]] = None) -> int:
     ports = compute_ports(exclude=exclude)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         chosen_port = 0
@@ -823,7 +823,7 @@ def get_available_port_if_any(exclude: list[str] | None = None) -> int:
         return chosen_port
 
 
-def compute_serving_port(args, quiet: bool = False, exclude: list[str] | None = None) -> str:
+def compute_serving_port(args, quiet: bool = False, exclude: Optional[list[str]] = None) -> str:
     # user probably specified a custom port, don't override the choice
     if hasattr(args, 'port_override'):
         target_port = args.port

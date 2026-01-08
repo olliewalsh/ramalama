@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import json
 import os
 import sys
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, Literal, Mapping, TypeAlias
+from typing import Any, Literal, Mapping, TYPE_CHECKING, Optional
+if TYPE_CHECKING:
+    from typing import TypeAlias
 
 from ramalama.cli_arg_normalization import normalize_pull_arg
 from ramalama.common import apple_vm, available
@@ -68,7 +72,7 @@ def _get_default_config_dirs() -> list[Path]:
 DEFAULT_CONFIG_DIRS = _get_default_config_dirs()
 
 
-def get_default_engine() -> SUPPORTED_ENGINES | None:
+def get_default_engine() -> Optional[SUPPORTED_ENGINES]:
     """Determine the container manager to use based on environment and platform."""
     if os.path.exists("/run/.toolboxenv"):
         return None
@@ -148,7 +152,7 @@ class UserConfig:
 class RamalamaSettings:
     """These settings are not managed directly by the user"""
 
-    config_files: list[str] | None = None
+    config_files: Optional[list[str]] = None
 
 
 @dataclass
@@ -214,7 +218,7 @@ class HTTPClientConfig:
 @dataclass
 class BaseConfig:
     api: str = "none"
-    api_key: str | None = None
+    api_key: Optional[str] = None
     cache_reuse: int = 256
     carimage: str = "registry.access.redhat.com/ubi10-micro:latest"
     container: bool = None  # type: ignore
@@ -223,12 +227,12 @@ class BaseConfig:
     default_image: str = DEFAULT_IMAGE
     default_rag_image: str = DEFAULT_RAG_IMAGE
     dryrun: bool = False
-    engine: SUPPORTED_ENGINES | None = field(default_factory=get_default_engine)
+    engine: Optional[SUPPORTED_ENGINES] = field(default_factory=get_default_engine)
     env: list[str] = field(default_factory=list)
     host: str = "0.0.0.0"
     image: str = None  # type: ignore
     images: RamalamaImages = field(default_factory=RamalamaImages)
-    rag_image: str | None = None
+    rag_image: Optional[str] = None
     rag_images: RamalamaRagImages = field(default_factory=RamalamaRagImages)
     keep_groups: bool = False
     max_tokens: int = 0
@@ -252,7 +256,7 @@ class BaseConfig:
     verify: bool = True
     gguf_quantization_mode: GGUF_QUANTIZATION_MODES = DEFAULT_GGUF_QUANTIZATION_MODE
     http_client: HTTPClientConfig = field(default_factory=HTTPClientConfig)
-    log_level: LogLevel | None = None
+    log_level: Optional[LogLevel] = None
 
     def __post_init__(self):
         self.container = coerce_to_bool(self.container) if self.container is not None else self.engine is not None
@@ -318,7 +322,7 @@ def load_file_config() -> dict[str, Any]:
     return config
 
 
-def load_env_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
+def load_env_config(env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
     if env is None:
         env = os.environ
 
@@ -363,7 +367,7 @@ def load_env_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     return config
 
 
-def default_config(env: Mapping[str, str] | None = None) -> Config:
+def default_config(env: Optional[Mapping[str, str]] = None) -> Config:
     """Returns a default Config object with all layers initialized."""
     return Config(load_env_config(env), load_file_config())
 

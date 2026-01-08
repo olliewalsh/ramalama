@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Optional
 
 from ramalama.arg_types import ChatArgsType
 from ramalama.common import perror
@@ -97,13 +98,13 @@ def add_api_key(args, headers=None):
 @dataclass
 class ChatOperationalArgs:
     initial_connection: bool = False
-    name: str | None = None
-    keepalive: int | None = None
-    monitor: "ServerMonitor | None" = None
+    name: Optional[str] = None
+    keepalive: Optional[int] = None
+    monitor: Optional["ServerMonitor"] = None
 
 
 class RamaLamaShell(cmd.Cmd):
-    def __init__(self, args: ChatArgsType, operational_args: ChatOperationalArgs | None = None):
+    def __init__(self, args: ChatArgsType, operational_args: Optional[ChatOperationalArgs] = None):
         if operational_args is None:
             operational_args = ChatOperationalArgs()
 
@@ -115,7 +116,7 @@ class RamaLamaShell(cmd.Cmd):
         self.prompt = args.prefix
         self.url = f"{args.url}/chat/completions"
         self.prep_rag_message()
-        self.mcp_agent: LLMAgent | None = None
+        self.mcp_agent: Optional[LLMAgent] = None
         self.initialize_mcp()
 
         self.content: list[str] = []
@@ -721,7 +722,7 @@ def _report_server_exit(monitor):
         perror("Check server logs for more details about why the service exited.")
 
 
-def chat(args: ChatArgsType, operational_args: ChatOperationalArgs | None = None):
+def chat(args: ChatArgsType, operational_args: Optional[ChatOperationalArgs] = None):
     if args.dryrun:
         assert args.ARGS is not None
         prompt = " ".join(args.ARGS)
