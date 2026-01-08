@@ -2,6 +2,7 @@ import json
 import random
 import re
 import string
+import sys
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError
 from test.conftest import (
@@ -357,6 +358,7 @@ def test_pull_with_registry(container_registry, container_engine):
 
         # Check if the fake model was pulled correctly
         model_list = json.loads(ctx.check_output(ramalama_cli + ["list", "--json", "--sort", "modified"]))
+        sys.stderr.write(f"Model list: {model_list}\n")
         assert model_list[0]["name"] == fake_model_registry_url
 
         # Clean fake image
