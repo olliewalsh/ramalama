@@ -212,6 +212,16 @@ class HTTPClientConfig:
 
 
 @dataclass
+class RuntimeConfig:
+    """e.g RAMALAMA__RUNTIME_CONFIG__CONTAINER_ENTRYPOINT=llama-server"""
+
+    container_entrypoint: str | None = None
+    container_args: list[str] = field(default_factory=list)
+    native_binary: str | None = None
+    native_args: list[str] = field(default_factory=list)
+
+
+@dataclass
 class BaseConfig:
     api: str = "none"
     api_key: str | None = None
@@ -239,6 +249,7 @@ class BaseConfig:
     pull: str = "newer"
     rag_format: Literal["qdrant", "json", "markdown", "milvus"] = "qdrant"
     runtime: SUPPORTED_RUNTIMES = "llama.cpp"
+    runtime_config: RuntimeConfig = field(default_factory=RuntimeConfig)
     selinux: bool = False
     settings: RamalamaSettings = field(default_factory=RamalamaSettings)
     stack_image: str = DEFAULT_STACK_IMAGE

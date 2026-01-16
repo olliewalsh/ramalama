@@ -1,9 +1,12 @@
-schema_version: "1.0.0"
+schema_version: "1.0.1"
 commands:
   - name: serve
     inference_engine:
       name: "llama-server"
-      binary: "llama-server"
+      native_cli:
+        binary: "llama-server"
+      container_cli:
+        entrypoint: "llama-server"
       options: &serve_run_options
         - name: "--host"
           description: "IP address for the AI model server to listen on"
@@ -94,12 +97,18 @@ commands:
   - name: run
     inference_engine:
       name: "llama-server with chat"
-      binary: "llama-server"
+      native_cli:
+        binary: "llama-server"
+      container_cli:
+        entrypoint: "llama-server"
       options: *serve_run_options
   - name: perplexity
     inference_engine:
       name: "llama-perplexity"
-      binary: "llama-perplexity"
+      native_cli:
+        binary: "llama-perplexity"
+      container_cli:
+        entrypoint: "llama-perplexity"
       options: &bench_perplexity_options
         - name: "--model"
           description: "The AI model to run"
@@ -116,12 +125,18 @@ commands:
   - name: bench
     inference_engine:
       name: "llama-bench"
-      binary: "llama-bench"
+      native_cli:
+        binary: "llama-bench"
+      container_cli:
+        entrypoint: "llama-bench"
       options: *bench_perplexity_options
   - name: rag
     inference_engine:
       name: "rag"
-      binary: "doc2rag"
+      native_cli:
+        binary: "doc2rag"
+      container_cli:
+        args: ["doc2rag"]
       options:
         - name: "--debug"
           description: "Enable debug logging"
@@ -144,7 +159,10 @@ commands:
   - name: run --rag
     inference_engine:
       name: "RAG proxy with chat"
-      binary: "rag_framework"
+      native_cli:
+        binary: "rag_framework"
+      container_cli:
+        args: ["rag_framework"]
       options: &rag_framework_options
         - name: "--debug"
           description: "Enable debug logging"
@@ -167,12 +185,16 @@ commands:
   - name: serve --rag
     inference_engine:
       name: "llama-server with RAG proxy"
-      binary: "rag_framework"
+      native_cli:
+        binary: "rag_framework"
+      container_cli:
+        args: ["rag_framework"]
       options: *rag_framework_options
   - name: convert
     inference_engine:
       name: "convert hf to gguf"
-      binary: "convert_hf_to_gguf.py"
+      container_cli:
+        args: ["convert_hf_to_gguf.py"]
       options:
         - name: "--outfile"
           description: "Output file for the converted model"
@@ -183,7 +205,8 @@ commands:
   - name: quantize
     inference_engine:
       name: "quantize gguf model"
-      binary: "llama-quantize"
+      container_cli:
+        args: ["llama-quantize"]
       options:
         - name: ""
           description: "Input model to quantize"

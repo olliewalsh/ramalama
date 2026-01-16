@@ -70,7 +70,7 @@ class Quadlet:
 
         cmd_args = self.exec_args
         if len(cmd_args) > 0 and isinstance(cmd_args[0], ContainerEntryPoint):
-            # Ignore entrypoint
+            quadlet_file.add("Container", "Entrypoint", f"{cmd_args[0].entrypoint}")
             cmd_args = cmd_args[1:]
 
         exec_cmd = shlex.join(cmd_args)

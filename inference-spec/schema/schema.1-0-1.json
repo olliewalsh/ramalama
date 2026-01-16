@@ -19,13 +19,32 @@
           },
           "inference_engine": {
             "type": "object",
-            "required": ["name", "binary", "options"],
+            "required": ["name", "options"],
+            "anyOf": [
+              {
+                "required": ["native_cli"]
+              },
+              {
+                 "required": ["container_cli"]
+              }
+            ],
             "properties": {
               "name": { "type": "string" },
-              "binary": { "type": "string" },
-              "entrypoint": { "type": "string" },
-              "container_uses_binary": { "type": "boolean", "default": true },
-              "args": { "type": "array", "items": { "type": "string" } },
+              "native_cli": {
+                "type": "object",
+                "required": ["binary"],
+                "properties": {
+                  "binary": { "type": "string" },
+                  "args": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "container_cli": {
+                "type": "object",
+                "properties": {
+                  "entrypoint": { "type": "string" },
+                  "args": { "type": "array", "items": { "type": "string" } }
+                }
+              },
               "options": {
                 "type": "array",
                 "items": {

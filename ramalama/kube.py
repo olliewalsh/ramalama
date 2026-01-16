@@ -217,7 +217,7 @@ spec:
 """
         if not isinstance(self.exec_args[0], ContainerEntryPoint):
             content += f"""\
-        command: ["{self.exec_args[0]}"]
+        command: ["{self.exec_args[0].entrypoint}"]
 """
         content += f"""\
         args: {self.exec_args[1:]}

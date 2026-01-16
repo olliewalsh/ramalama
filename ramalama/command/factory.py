@@ -11,7 +11,8 @@ import yaml
 
 from ramalama.command import context, error, schema
 from ramalama.common import ContainerEntryPoint
-from ramalama.config import get_inference_schema_files, get_inference_spec_files
+from ramalama.config import CONFIG, get_inference_schema_files, get_inference_spec_files
+from ramalama.logger import logger
 
 
 def is_truthy(resolved_stmt: str) -> bool:
@@ -19,52 +20,64 @@ def is_truthy(resolved_stmt: str) -> bool:
 
 
 class CommandFactory:
+    spec_files = get_inference_spec_files()
+    schema_files = get_inference_schema_files()
 
-    def __init__(self, spec_files: dict[str, Path], schema_files: dict[str, Path]):
-        self.spec_files = spec_files
-        self.schema_files = schema_files
+    def __init__(self, runtime: str):
+        self.runtime = runtime
+        self.spec_file = self.spec_files.get(self.runtime, None)
+        if self.spec_file is None:
+            raise FileNotFoundError(f"No specification file found for runtime '{self.runtime}' ")
 
-    def create(self, runtime: str, command: str, ctx: context.RamalamaCommandContext) -> list[str]:
-        spec_file = self.spec_files.get(runtime, None)
-        if spec_file is None:
-            raise FileNotFoundError(f"No specification file found for runtime '{runtime}' ")
-        spec_data = CommandFactory.load_file(spec_file)
+        spec_data = self._load_file(self.spec_file)
         if schema.VERSION_FIELD not in spec_data:
             raise error.InvalidInferenceEngineSpecError(
-                str(spec_file), f"Missing required field '{schema.VERSION_FIELD}' "
+                str(self.spec_file), f"Missing required field '{schema.VERSION_FIELD}' "
             )
-
-        schema_file = self.schema_files.get(spec_data[schema.VERSION_FIELD].replace(".", "-"), None)
-        if schema_file is None:
-            raise FileNotFoundError(f"No schema file found for spec version '{spec_data[schema.VERSION_FIELD]}' ")
-
-        schema_data = CommandFactory.load_file(schema_file)
-
         try:
-            CommandFactory.validate_spec(spec_data, schema_data)
+            self._validate_spec(spec_data)
         except Exception as ex:
-            raise error.InvalidInferenceEngineSpecError(str(spec_file), str(ex)) from ex
+            logger.debug(f"Inference engine specification validation failed for '{self.runtime}'", exc_info=True)
+            raise error.InvalidInferenceEngineSpecError(str(self.spec_file), str(ex)) from ex
 
-        spec = schema.CommandSpecV1.from_dict(spec_data, command)
+        self.spec_data = self._migrate(spec_data)
+        logger.debug(f"Inference engine specification data for '{self.runtime}' loaded from '{self.spec_file}'")
+
+    def __call__(self, command: str, ctx: context.RamalamaCommandContext) -> list[str]:
+        spec = schema.CommandSpecV1.from_dict(self.spec_data, command)
         if spec is None:
-            raise NotImplementedError(f"The specification for '{runtime}' does not implement command '{command}' ")
+            raise NotImplementedError(f"The specification for '{self.runtime}' does not implement command '{command}' ")
 
-        return CommandFactory.resolve_cmd(spec, ctx)
+        cmd = self._resolve_cmd(spec, ctx)
+        logger.debug(f"Resolved command for '{self.runtime}' command '{command}' to '{cmd}'")
+        return cmd
 
-    @staticmethod
-    def resolve_cmd(spec: schema.CommandSpecV1, ctx: context.RamalamaCommandContext) -> list[str]:
+    def _resolve_cmd(self, spec: schema.CommandSpecV1, ctx: context.RamalamaCommandContext) -> list[str]:
         engine = spec.command.engine
 
         cmd = []
-        # FIXME: binary should be a string array to work with nocontainer
-        binary = CommandFactory.eval_stmt(engine.binary, ctx)
-        if is_truthy(binary):
-            cmd += shlex.split(binary)
+
+        if not CONFIG.container:
+            if CONFIG.runtime_config.native_binary is not None:
+                cmd.append(CONFIG.runtime_config.native_binary)
+            else:
+                cmd.append(engine.native_cli.binary)
+            if CONFIG.runtime_config.native_args is not None:
+                cmd.extend(CONFIG.runtime_config.native_args)
+            else:
+                cmd.extend(engine.native_cli.args)
         else:
-            cmd.append(ContainerEntryPoint())
+            if CONFIG.runtime_config.container_entrypoint is not None:
+                cmd.append(ContainerEntryPoint(CONFIG.runtime_config.container_entrypoint))
+            else:
+                cmd.append(ContainerEntryPoint(engine.container_cli.entrypoint))
+            if CONFIG.runtime_config.container_args is not None:
+                cmd.extend(CONFIG.runtime_config.container_args)
+            else:
+                cmd.extend(engine.container_cli.args)
 
         for option in engine.options:
-            should_add = option.condition is None or is_truthy(CommandFactory.eval_stmt(option.condition, ctx))
+            should_add = option.condition is None or is_truthy(self._eval_stmt(option.condition, ctx))
             if not should_add:
                 continue
 
@@ -72,7 +85,7 @@ class CommandFactory:
                 cmd.append(option.name)
                 continue
 
-            value = CommandFactory.eval_stmt(option.value, ctx)
+            value = self._eval_stmt(option.value, ctx)
             if is_truthy(value):
                 if option.name:
                     cmd.append(option.name)
@@ -84,8 +97,7 @@ class CommandFactory:
 
         return cmd
 
-    @staticmethod
-    def eval_stmt(stmt: str, ctx: context.RamalamaCommandContext) -> Any:
+    def _eval_stmt(self, stmt: str, ctx: context.RamalamaCommandContext) -> Any:
         if not ("{{" in stmt and "}}" in stmt):
             return stmt
 
@@ -97,12 +109,15 @@ class CommandFactory:
             }
         )
 
-    @staticmethod
-    def validate_spec(spec_data: dict, schema: dict):
-        jsonschema.validate(instance=spec_data, schema=schema)
+    def _validate_spec(self, spec_data: dict):
+        schema_version = spec_data[schema.VERSION_FIELD]
+        schema_file = self.schema_files.get(schema_version.replace(".", "-"), None)
+        if schema_file is None:
+            raise FileNotFoundError(f"No schema file found for spec version '{schema_version}' ")
+        schema_data = self._load_file(schema_file)
+        jsonschema.validate(instance=spec_data, schema=schema_data)
 
-    @staticmethod
-    def load_file(path: Path) -> dict:
+    def _load_file(self, path: Path) -> dict:
         if not path.exists():
             raise FileNotFoundError(f"File '{path}' not found")
 
@@ -114,10 +129,29 @@ class CommandFactory:
 
             raise NotImplementedError(f"File extension '{path.suffix}' not supported")
 
+    def _migrate(self, spec_data: dict) -> dict:
+        schema_version = spec_data[schema.VERSION_FIELD]
+        if schema_version == "1.0.0":
+            logger.debug(f"Migrating '{self.runtime}' spec data from version '{schema_version}' to '1.0.1'")
+            for command in spec_data.get("commands", []):
+                command["inference_engine"].setdefault("native_cli", {})["binary"] = command["inference_engine"][
+                    "binary"
+                ]
+                # For v1.0.0 pass the binary as an argument to the container command
+                command["inference_engine"].setdefault("container_cli", {})["entrypoint"] = command["inference_engine"][
+                    "binary"
+                ]
+                del command["inference_engine"]["binary"]
+            spec_data[schema.VERSION_FIELD] = "1.0.1"
+            try:
+                self._validate_spec(spec_data)
+            except Exception as ex:
+                raise error.InvalidInferenceEngineSpecError(str(self.spec_file), str(ex)) from ex
+        return spec_data
+
 
 def assemble_command(cli_args: argparse.Namespace) -> list[str]:
-    cmd_factory = CommandFactory(get_inference_spec_files(), get_inference_schema_files())
     runtime = str(cli_args.runtime)
     command = str(cli_args.subcommand)
     ctx = context.RamalamaCommandContext.from_argparse(cli_args)
-    return cmd_factory.create(runtime, command, ctx)
+    return CommandFactory(runtime)(command, ctx)

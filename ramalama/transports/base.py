@@ -402,12 +402,12 @@ class Transport(TransportBase):
         if not args.container:
             return False
 
-        if len(cmd_args) > 0 and isinstance(cmd_args[0], ContainerEntryPoint):
-            # Ignore entrypoint
-            cmd_args = cmd_args[1:]
-
         self.setup_container(args)
         self.setup_mounts(args)
+
+        if len(cmd_args) > 0 and isinstance(cmd_args[0], ContainerEntryPoint):
+            self.engine.add_entrypoint(cmd_args[0].entrypoint)
+            cmd_args = cmd_args[1:]
 
         # Make sure Image precedes cmd_args
         self.engine.add([args.image] + cmd_args)
@@ -465,10 +465,6 @@ class Transport(TransportBase):
         # The Run command will first launch a daemonized service
         # and run chat to communicate with it.
 
-        if len(cmd) > 0 and isinstance(cmd[0], ContainerEntryPoint):
-            # Ignore entrypoint
-            cmd = cmd[1:]
-
         process = self.serve_nonblocking(args, cmd)
         if process:
             return self._connect_and_chat(args, process)
@@ -488,6 +484,11 @@ class Transport(TransportBase):
             # For container mode, set up the container and start it with subprocess
             self.setup_container(args)
             self.setup_mounts(args)
+
+            if len(cmd) > 0 and isinstance(cmd[0], ContainerEntryPoint):
+                self.engine.add_entrypoint(cmd[0].entrypoint)
+                cmd = cmd[1:]
+
             # Make sure Image precedes cmd_args
             self.engine.add([args.image] + cmd)
 

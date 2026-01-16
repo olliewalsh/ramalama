@@ -207,6 +207,9 @@ class Engine(BaseEngine):
         if self.use_tty():
             self.add_args("-t")
 
+    def add_entrypoint(self, entrypoint: str) -> None:
+        self.add_args("--entrypoint", entrypoint)
+
 
 class BuildEngine(BaseEngine):
     """Engine for executing 'podman build'"""

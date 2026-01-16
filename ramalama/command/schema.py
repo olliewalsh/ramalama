@@ -23,9 +23,33 @@ class CommandSpecV1:
 
             return option
 
+    class NativeCli:
+        binary: str
+        args: list[str]
+
+        @staticmethod
+        def from_dict(d: dict) -> "CommandSpecV1.NativeCli":
+            native_args = CommandSpecV1.NativeCli()
+            native_args.binary = d["binary"]
+            native_args.args = d.get("args", [])
+            return native_args
+
+    class ContainerCli:
+        entrypoint: str
+        args: list[str]
+
+        @staticmethod
+        def from_dict(d: dict) -> "CommandSpecV1.ContainerCli":
+            container_args = CommandSpecV1.ContainerCli()
+            # Note: entrypoint == None means use the container entrypoint
+            container_args.entrypoint = d.get("entrypoint", None)
+            container_args.args = d.get("args", [])
+            return container_args
+
     class Engine:
         name: str
-        binary: str
+        native_cli: "CommandSpecV1.NativeCli"
+        container_cli: "CommandSpecV1.ContainerCli"
         options: list["CommandSpecV1.Option"]
 
         @staticmethod
@@ -33,11 +57,9 @@ class CommandSpecV1:
             engine = CommandSpecV1.Engine()
 
             engine.name = d["name"]
-            engine.binary = d["binary"]
-            engine.options = []
-            for option in d["options"]:
-                opt = CommandSpecV1.Option.from_dict(option)
-                engine.options.append(opt)
+            engine.native_cli = CommandSpecV1.NativeCli.from_dict(d.get("native_cli", {}))
+            engine.container_cli = CommandSpecV1.ContainerCli.from_dict(d.get("container_cli", {}))
+            engine.options = [CommandSpecV1.Option.from_dict(o) for o in d.get("options", [])]
 
             return engine
 

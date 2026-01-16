@@ -1,9 +1,10 @@
-schema_version: "1.0.0"
+schema_version: "1.0.1"
 commands:
   - name: serve
     inference_engine:
       name: "mlx server"
-      binary: "mlx_lm.server"
+      native_cli:
+        binary: "mlx_lm.server"
       options: &serve_run_options
         - name: "--model"
           description: "The AI model to run"
