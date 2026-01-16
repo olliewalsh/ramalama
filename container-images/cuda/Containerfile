@@ -29,3 +29,4 @@ RUN python3 -m ensurepip && \
 WORKDIR /
 ENTRYPOINT []
 CMD ["/bin/bash"]
+RUN ln -s /usr/bin /app

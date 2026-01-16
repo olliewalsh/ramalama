@@ -17,3 +17,4 @@ ENTRYPOINT [ \
     "-c", \
     "export LD_LIBRARY_PATH=/usr/lib:${LD_LIBRARY_PATH} && source /usr/local/Ascend/ascend-toolkit/set_env.sh && exec \"$@\"", "--" \
 ]
+RUN ln -s /usr/bin /app

@@ -7,3 +7,4 @@ COPY container-images/scripts/build_llama_and_whisper.sh \
 WORKDIR /src/
 RUN ./build_llama_and_whisper.sh asahi
 WORKDIR /
+RUN ln -s /usr/bin /app
