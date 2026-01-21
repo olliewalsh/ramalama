@@ -38,6 +38,7 @@ def in_existing_cache(organization, model_name, model_tag):
 class OllamaRepository:
     REGISTRY_URL = "https://registry.ollama.ai/v2"
     ACCEPT = "Accept: application/vnd.docker.distribution.manifest.v2+json"
+    USER_AGENT = "Go-http-client/1.1"
 
     FILE_NAME_CONFIG = "config.json"
     FILE_NAME_CHAT_TEMPLATE = "chat_template"
@@ -47,7 +48,7 @@ class OllamaRepository:
         self.namespace = namespace
         self.registry_head = f"{OllamaRepository.REGISTRY_URL}/{self.namespace}/{self.name}"
         self.blob_url = f"{self.registry_head}/blobs"
-        self.headers = {"Accept": OllamaRepository.ACCEPT}
+        self.headers = {"Accept": OllamaRepository.ACCEPT, "User-Agent": OllamaRepository.USER_AGENT}
 
     def fetch_manifest(self, tag: str):
         try:
