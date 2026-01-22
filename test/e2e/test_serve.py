@@ -641,6 +641,7 @@ def test_serve_kube_generation(test_model, generate, env_vars):
 
 
 @pytest.mark.e2e
+@pytest.mark.llama_stack
 @skip_if_no_container
 @skip_if_docker
 def test_kube_generation_with_llama_api(test_model):

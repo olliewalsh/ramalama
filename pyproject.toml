@@ -168,7 +168,7 @@ lcov.output = "coverage/coverage.lcov"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
-markers = ["e2e", "distro_integration"]
+markers = ["e2e", "distro_integration", "llama_stack"]
 addopts = "-m 'not e2e' --color=yes"
 
 [tool.setuptools.packages.find]
@@ -217,7 +217,7 @@ deps = [
 commands = [
   [
     "pytest",
-    "-m", "e2e",
+    "-m", "e2e and (not llama_stack)",
     "-vvv",
     "--basetemp={envtmpdir}",
     "--tb=short",
