@@ -1,11 +1,11 @@
 FROM quay.io/fedora/fedora:43 as builder
 
 COPY container-images/intel-gpu/oneAPI.repo /etc/yum.repos.d/
-COPY container-images/scripts/build_llama_and_whisper.sh \
+COPY container-images/scripts/build_llama.sh \
      container-images/scripts/lib.sh \
      /src/
 WORKDIR /src/
-RUN ./build_llama_and_whisper.sh intel-gpu
+RUN ./build_llama.sh intel-gpu
 
 FROM quay.io/fedora/fedora:43
 
@@ -14,7 +14,7 @@ COPY container-images/intel-gpu/oneAPI.repo /etc/yum.repos.d/
 
 RUN dnf install -y --setopt=install_weak_deps=false \
       procps-ng intel-oneapi-runtime-mkl intel-oneapi-mkl-sycl-dft \
-      intel-level-zero oneapi-level-zero intel-compute-runtime libcurl lspci \
+      intel-level-zero oneapi-level-zero intel-compute-runtime lspci \
       clinfo intel-oneapi-runtime-compilers intel-oneapi-mkl-core \
       intel-oneapi-mkl-sycl-blas intel-oneapi-runtime-dnnl gawk
 
