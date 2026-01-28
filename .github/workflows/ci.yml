@@ -460,6 +460,13 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     steps:
+
+      - name: Free disk space
+        shell: bash
+        run: |
+          xcrun simctl delete all
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+
       - uses: actions/checkout@v6
 
       - name: Install the latest version of uv
