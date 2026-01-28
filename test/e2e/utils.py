@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from test.conftest import ramalama_container, ramalama_container_engine
 
+WSL_TMP_DIR = r'\\wsl.localhost\podman-machine-default\var\tmp'
+
 
 class RamalamaExecWorkspace:
     def __init__(
@@ -21,7 +23,10 @@ class RamalamaExecWorkspace:
         self.isolated = isolated
         self.config = config
         self.environ = os.environ.copy()
-        self.workspace_dir = tempfile.mkdtemp() if self.isolated or self.config else None
+        if platform.system() == "Windows":
+            self.workspace_dir = tempfile.mkdtemp(dir=WSL_TMP_DIR) if isolated or config else None
+        else:
+            self.workspace_dir = tempfile.mkdtemp() if self.isolated or self.config else None
         if self.workspace_dir and platform.system() == "Windows":
             self.workspace_dir = ntpath.realpath(self.workspace_dir)
         self.storage_dir = None
@@ -42,7 +47,7 @@ class RamalamaExecWorkspace:
         if self.isolated or self.config:
             storage_dir = Path(self.workspace_dir) / ".storage"
             storage_dir.mkdir()
-            self.storage_dir = storage_dir.as_posix()
+            self.storage_dir = str(storage_dir)
 
         # Enable env variables from pytest addoption parameters
         if container_discover:

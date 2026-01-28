@@ -3,8 +3,11 @@
 import os
 import platform
 import string
-from pathlib import Path, PureWindowsPath
+import subprocess
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import unquote_to_bytes
+
+from ramalama.common import run_cmd
 
 
 def normalize_host_path_for_container(host_path: str) -> str:
@@ -112,6 +115,9 @@ def get_container_mount_path(host_path: str) -> str:
     return normalize_host_path_for_container(real_path)
 
 
+WSL_ROOT_DIR = r'\\wsl.localhost\podman-machine-default'
+
+
 def create_file_link(src: str, dst: str) -> None:
     """
     Create a link from dst to src using the best available method for the platform.
@@ -162,7 +168,19 @@ def create_file_link(src: str, dst: str) -> None:
         # Symlink failed - likely Windows without developer mode
         pass
 
-    # Strategy 3: Last resort - copy the file
+    # Strategy 3: Try to create a hardlink on the WSL VM
+    if platform.system() == "Windows":
+        wsl_root = Path(WSL_ROOT_DIR).resolve()
+        if Path(src).resolve().is_relative_to(wsl_root) and Path(dst).resolve().is_relative_to(wsl_root):
+            src_wsl = PurePosixPath('/' + Path(src).resolve().relative_to(wsl_root).as_posix())
+            dst_wsl = PurePosixPath('/' + Path(dst).resolve().relative_to(wsl_root).as_posix())
+            try:
+                run_cmd(["podman", "machine", "ssh", "ln", str(src_wsl), str(dst_wsl)], encoding="utf-8")
+                return
+            except subprocess.CalledProcessError:
+                pass
+
+    # Strategy 4: Last resort - copy the file
     # This uses more disk space but always works
     try:
         import shutil

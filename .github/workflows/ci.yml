@@ -537,7 +537,7 @@ jobs:
           podman --version
 
           Write-Host "Initializing Podman machine..."
-          podman machine init --now --rootful
+          podman machine init --now --rootful --cpus 4 --memory 12288 --disk-size 10
 
           # Wait for Podman to be ready
           $maxAttempts = 30
