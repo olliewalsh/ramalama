@@ -9,15 +9,17 @@ from urllib.parse import unquote_to_bytes
 
 from ramalama.common import run_cmd
 
+WSL_ROOT_DIR = r'\\wsl.localhost\podman-machine-default'
 
 def normalize_host_path_for_container(host_path: str) -> str:
     """
     Convert a host filesystem path to a format suitable for container volume mounts.
 
-    On Windows with Docker Desktop:
+    On Windows with podman machine:
     - Converts Windows paths (C:\\Users\\...) to Unix-style paths (/c/Users/...)
     - Handles both absolute and relative paths
     - Preserves forward slashes
+    - Handles UNC paths on the podman machine VM
 
     On Linux/macOS:
     - Returns the path unchanged (already in correct format)
@@ -46,8 +48,9 @@ def normalize_host_path_for_container(host_path: str) -> str:
     # e.g if the model store is placed on the podman machine VM to reduce copying
     # \\wsl.localhost\podman-machine-default\home\user\.local\share\ramalama\store
     # NOTE: UNC paths cannot be accessed implicitly from the container, would need to smb mount
-    if path.drive.startswith("\\\\"):
-        return '/' + path.relative_to(path.drive).as_posix()
+    wsl_root = Path(WSL_ROOT_DIR).resolve()
+    if Path(path).resolve().is_relative_to(wsl_root):
+        return str(PurePosixPath('/' + Path(path).resolve().relative_to(wsl_root).as_posix()))
 
     if not path.drive:
         return path.as_posix()
@@ -113,9 +116,6 @@ def get_container_mount_path(host_path: str) -> str:
 
     # Then normalize for container use
     return normalize_host_path_for_container(real_path)
-
-
-WSL_ROOT_DIR = r'\\wsl.localhost\podman-machine-default'
 
 
 def create_file_link(src: str, dst: str) -> None:
