@@ -69,7 +69,7 @@ class HttpClient:
         last_update_time = time.time()
         try:
             while True:
-                data = self.response.read(1024)
+                data = self.response.read(1048576)
                 if not data:
                     break
 

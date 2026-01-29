@@ -281,7 +281,7 @@ def verify_checksum(filename: str) -> bool:
     # Calculate the SHA-256 checksum of the file contents
     sha256_hash = hashlib.sha256()
     with open(filename, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
+        for byte_block in iter(lambda: f.read(1048576), b""):
             sha256_hash.update(byte_block)
 
     # Compare the checksums
