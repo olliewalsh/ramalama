@@ -20,6 +20,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
+      - shell:
+        bash: |
+          echo "github.event.push.repository_owner: ${{ github.event.push.repository_owner }}"
+          echo "github.event_name: ${{ github.event_name }}"
+          echo "github.ref: ${{ github.ref }}"
+
       - uses: actions/checkout@v6
 
       - name: Install the latest version of uv
