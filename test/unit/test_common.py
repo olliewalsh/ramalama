@@ -243,6 +243,50 @@ backend = "{backend}"
                 assert accel_image(config) == expected_result
 
 
+@pytest.mark.parametrize(
+    "gpu_env,backend,expected_image",
+    [
+        # AMD GPU: vLLM should use ROCm image regardless of backend
+        ("HIP_VISIBLE_DEVICES", "auto", "docker.io/vllm/vllm-openai-rocm:latest"),
+        ("HIP_VISIBLE_DEVICES", "vulkan", "docker.io/vllm/vllm-openai-rocm:latest"),
+        ("HIP_VISIBLE_DEVICES", "rocm", "docker.io/vllm/vllm-openai-rocm:latest"),
+        # NVIDIA GPU: vLLM uses standard CUDA image
+        ("CUDA_VISIBLE_DEVICES", "auto", "docker.io/vllm/vllm-openai:latest"),
+        ("CUDA_VISIBLE_DEVICES", "cuda", "docker.io/vllm/vllm-openai:latest"),
+        # Intel GPU: vLLM uses Intel-specific image regardless of backend
+        ("INTEL_VISIBLE_DEVICES", "auto", "docker.io/intel/vllm:latest"),
+        ("INTEL_VISIBLE_DEVICES", "vulkan", "docker.io/intel/vllm:latest"),
+        ("INTEL_VISIBLE_DEVICES", "intel", "docker.io/intel/vllm:latest"),
+    ],
+)
+def test_vllm_backend_image_selection(gpu_env: str, backend: str, expected_image: str, monkeypatch):
+    """Test that vLLM uses correct images based on detected GPU, not backend selection."""
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+    monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
+
+    with NamedTemporaryFile('w', delete_on_close=False) as f:
+        f.write(f"""\
+[ramalama]
+backend = "{backend}"
+runtime = "vllm"
+            """)
+        f.flush()
+
+        env = {
+            "RAMALAMA_CONFIG": f.name,
+            gpu_env: "1",
+        }
+
+        with patch.dict("os.environ", env, clear=True):
+            config = default_config()
+            with patch("ramalama.cli.get_config", return_value=config):
+                default_image.cache_clear()
+                default_rag_image.cache_clear()
+                parser = create_argument_parser("test_vllm")
+                configure_subcommands(parser)
+                assert accel_image(config) == expected_image
+
+
 def test_backend_incompatibility_warning(monkeypatch, caplog):
     """Test that warnings are issued for incompatible backend selections."""
     import logging
