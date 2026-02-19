@@ -71,9 +71,15 @@ OpenAI-compatible API key. Can also be set via the RAMALAMA_API_KEY environment 
 
 **backend**="auto"
 
-GPU backend to use for inference (default: auto).
+GPU backend to use for llama.cpp runtime (default: auto).
 
-The `backend` option controls which GPU backend RamaLama uses when running AI models. This setting affects which container image is selected and how GPU resources are utilized.
+The `backend` option controls which GPU backend llama.cpp uses when running AI models. This setting
+only applies to the llama.cpp runtime (the default). Other runtimes automatically use vendor-specific
+images:
+- **vLLM**: Always uses vendor-optimized images (ROCm for AMD, Intel for Intel, CUDA for NVIDIA)
+- **MLX**: macOS-specific runtime with fixed configuration
+
+This setting affects which container image is selected and how GPU resources are utilized for llama.cpp.
 
 Valid options: auto, vulkan, rocm, cuda, intel
 
