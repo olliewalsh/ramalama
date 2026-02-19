@@ -1028,13 +1028,15 @@ def runtime_options(parser, command):
             help="IP address to listen",
             completer=suppressCompleter,
         )
-    parser.add_argument(
-        "--backend",
-        dest="backend",
-        default=config.backend,
-        choices=get_available_backends(),
-        help="GPU backend to use (auto, vulkan, rocm, cuda, intel). See man page for details.",
-    )
+    # Backend option only applicable for llama.cpp runtime
+    if config.runtime == "llama.cpp":
+        parser.add_argument(
+            "--backend",
+            dest="backend",
+            default=config.backend,
+            choices=get_available_backends(),
+            help="GPU backend to use (auto, vulkan, rocm, cuda, intel). See man page for details.",
+        )
     parser.add_argument(
         "--image",
         default=default_image(),
