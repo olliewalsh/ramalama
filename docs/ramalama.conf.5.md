@@ -69,6 +69,35 @@ Options: llama-stack, none
 
 OpenAI-compatible API key. Can also be set via the RAMALAMA_API_KEY environment variable.
 
+**backend**="auto"
+
+GPU backend to use for inference (default: auto).
+
+The `backend` option controls which GPU backend RamaLama uses when running AI models. This setting affects which container image is selected and how GPU resources are utilized.
+
+Valid options: auto, vulkan, rocm, cuda, intel
+
+- **auto** (default): Automatically selects the preferred backend based on detected GPU:
+  - AMD GPUs: vulkan (Linux/macOS) or rocm (Windows)
+  - NVIDIA GPUs: cuda
+  - Intel GPUs: vulkan (Linux/macOS) or intel (Windows)
+  - No GPU: vulkan (CPU fallback)
+
+- **vulkan**: Use Vulkan-based inference (compatible with AMD, Intel, and CPU)
+- **rocm**: Use AMD ROCm backend (AMD GPUs only)
+- **cuda**: Use NVIDIA CUDA backend (NVIDIA GPUs only)
+- **intel**: Use Intel GPU backend (Intel GPUs only)
+
+**Platform-specific behavior**: On Windows, vulkan is not supported on WSL2, so vendor-specific backends (rocm for AMD, intel for Intel) are automatically preferred when using `backend="auto"`.
+
+The RAMALAMA_BACKEND environment variable overrides this field.
+
+Example configuration:
+```toml
+[ramalama]
+backend = "vulkan"  # Force Vulkan for all GPUs
+```
+
 **carimage**="registry.access.redhat.com/ubi10-micro:latest"
 
 OCI model car image

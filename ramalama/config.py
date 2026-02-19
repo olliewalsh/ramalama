@@ -240,6 +240,7 @@ class HTTPClientConfig:
 class BaseConfig:
     api: str = "none"
     api_key: str | None = None
+    backend: Literal["auto", "vulkan", "rocm", "cuda", "intel"] = "auto"
     benchmarks: Benchmarks = field(default_factory=Benchmarks)
     cache_reuse: int = 256
     carimage: str = "registry.access.redhat.com/ubi10-micro:latest"
