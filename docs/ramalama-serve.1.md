@@ -59,9 +59,14 @@ The default can be overridden in the `ramalama.conf` file.
 Path of the authentication file for OCI registries
 
 #### **--backend**=*auto* | vulkan | rocm | cuda | intel
-GPU backend to use for inference (default: auto).
+GPU backend to use for inference (default: auto). **Only available with llama.cpp runtime.**
 
-The `--backend` option allows you to select which GPU backend to use for running AI models.
+The `--backend` option allows you to select which GPU backend llama.cpp uses for running AI models.
+This option is only available when using the llama.cpp runtime (the default). Other runtimes use
+vendor-specific images automatically:
+- **vLLM**: Always uses vendor-optimized images (ROCm for AMD, Intel for Intel, CUDA for NVIDIA)
+- **MLX**: macOS-specific runtime with fixed configuration
+
 Available backends depend on the detected GPU hardware.
 
 **auto** (default): Automatically selects the preferred backend based on your GPU:
