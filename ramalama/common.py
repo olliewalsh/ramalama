@@ -754,10 +754,12 @@ def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_
                 )
 
     if config.runtime == "vllm":
-        # Check for GPU-specific VLLM image, with a fallback to the generic one.
+        # vLLM requires vendor-specific backends for GPU acceleration
+        # Use detected GPU type (not backend-modified) to select the right vLLM image
         image = None
-        if gpu_type:
-            image = config.images.get(f"VLLM_{gpu_type}")
+        if detected_gpu_type:
+            # For AMD GPUs, always use ROCm-based vLLM image regardless of backend
+            image = config.images.get(f"VLLM_{detected_gpu_type}")
 
         if not image:
             image = config.images.get("VLLM", "docker.io/vllm/vllm-openai")

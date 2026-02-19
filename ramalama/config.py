@@ -206,13 +206,9 @@ class RamalamaImages(RamalamaImageConfig):
     HIP_VISIBLE_DEVICES: str = "quay.io/ramalama/rocm"
     INTEL_VISIBLE_DEVICES: str = "quay.io/ramalama/intel-gpu"
     MUSA_VISIBLE_DEVICES: str = "quay.io/ramalama/musa"
-    VLLM_ASAHI_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
-    VLLM_ASCEND_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
     VLLM_CUDA_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
-    VLLM_GGML_VK_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
-    VLLM_HIP_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
-    VLLM_INTEL_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
-    VLLM_MUSA_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai"
+    VLLM_HIP_VISIBLE_DEVICES: str = "docker.io/vllm/vllm-openai-rocm"
+    VLLM_INTEL_VISIBLE_DEVICES: str = "docker.io/intel/vllm"
 
 
 @dataclass
