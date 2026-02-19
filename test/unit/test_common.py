@@ -287,9 +287,8 @@ runtime = "vllm"
                 assert accel_image(config) == expected_image
 
 
-def test_backend_incompatibility_warning(monkeypatch, caplog):
+def test_backend_incompatibility_warning(monkeypatch):
     """Test that warnings are issued for incompatible backend selections."""
-    import logging
     monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
     monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
 
@@ -313,13 +312,15 @@ backend = "cuda"
                 parser = create_argument_parser("test_backend_warning")
                 configure_subcommands(parser)
 
-                with caplog.at_level(logging.WARNING):
+                with patch("ramalama.common.logger.warning") as mock_warning:
                     result = accel_image(config)
                     # Should still use the requested backend
                     assert result == "quay.io/ramalama/cuda:latest"
                     # But should warn about incompatibility
-                    assert any("may not be compatible" in record.message for record in caplog.records)
-                    assert any("HIP GPU" in record.message for record in caplog.records)
+                    mock_warning.assert_called_once()
+                    call_args = mock_warning.call_args[0][0]
+                    assert "may not be compatible" in call_args
+                    assert "HIP GPU" in call_args
 
 
 @pytest.mark.parametrize(
