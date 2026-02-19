@@ -633,6 +633,81 @@ AccelImageArgs: TypeAlias = (
 )
 
 
+def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
+    """
+    Returns preferred backends for a given GPU type in order of preference.
+    On Windows, vulkan is not supported on WSL2, so vendor backends are preferred.
+
+    Args:
+        gpu_type: GPU environment variable name (e.g., "HIP_VISIBLE_DEVICES")
+
+    Returns:
+        List of backend preferences in order (first is most preferred)
+    """
+    is_windows = platform.system() == "Windows"
+
+    # Default preferences (Linux/macOS): Vulkan preferred for AMD/Intel
+    preferences = {
+        "HIP_VISIBLE_DEVICES": ["vulkan", "rocm"],      # AMD: Vulkan preferred
+        "CUDA_VISIBLE_DEVICES": ["cuda"],               # NVIDIA: CUDA only
+        "INTEL_VISIBLE_DEVICES": ["vulkan", "intel"],   # Intel: Vulkan preferred
+        "ASAHI_VISIBLE_DEVICES": ["vulkan"],            # Asahi: Vulkan only
+        "ASCEND_VISIBLE_DEVICES": ["cann"],             # Ascend: CANN only
+        "MUSA_VISIBLE_DEVICES": ["musa"],               # MUSA: MUSA only
+        "GGML_VK_VISIBLE_DEVICES": ["vulkan"],          # Vulkan: Vulkan only
+    }
+
+    # Windows: Vulkan falls back to CPU, prefer vendor-specific backends
+    if is_windows:
+        preferences["HIP_VISIBLE_DEVICES"] = ["rocm", "vulkan"]
+        preferences["INTEL_VISIBLE_DEVICES"] = ["intel", "vulkan"]
+
+    return preferences.get(gpu_type, [])
+
+
+def get_available_backends() -> list[str]:
+    """
+    Returns available backends based on detected GPU, in preference order.
+    Always includes 'auto' as the first option.
+
+    Returns:
+        List of available backends including 'auto'
+    """
+    set_gpu_type_env_vars()
+    gpu_type = next(iter(get_gpu_type_env_vars()), "")
+
+    if gpu_type:
+        # Get GPU-specific preferences
+        preferences = get_gpu_backend_preferences(gpu_type)
+        if preferences:
+            return ["auto"] + preferences
+
+    # No GPU detected - return auto and vulkan (CPU fallback)
+    return ["auto", "vulkan"]
+
+
+def backend_to_gpu_env(backend: str) -> str:
+    """
+    Maps a backend name to its corresponding GPU environment variable.
+
+    Args:
+        backend: Backend name (e.g., "vulkan", "rocm", "cuda", "intel")
+
+    Returns:
+        GPU environment variable name
+    """
+    mapping = {
+        "vulkan": "GGML_VK_VISIBLE_DEVICES",
+        "rocm": "HIP_VISIBLE_DEVICES",
+        "cuda": "CUDA_VISIBLE_DEVICES",
+        "intel": "INTEL_VISIBLE_DEVICES",
+        "cann": "ASCEND_VISIBLE_DEVICES",
+        "musa": "MUSA_VISIBLE_DEVICES",
+        "asahi": "ASAHI_VISIBLE_DEVICES",
+    }
+    return mapping.get(backend, "")
+
+
 def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_key: str = "image") -> str:
     """
     Selects and the appropriate image based on config, arguments, environment.
@@ -649,7 +724,34 @@ def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_
         images = config.images
 
     set_gpu_type_env_vars()
-    gpu_type = next(iter(get_gpu_type_env_vars()), "")
+    detected_gpu_type = next(iter(get_gpu_type_env_vars()), "")
+    gpu_type = detected_gpu_type
+
+    # Apply backend selection based on user preference
+    backend = config.backend
+
+    if backend == "auto":
+        # Auto mode: use GPU-specific preference order
+        # AMD: vulkan > rocm, NVIDIA: cuda > vulkan, Intel: intel > vulkan
+        preferences = get_gpu_backend_preferences(detected_gpu_type)
+        if preferences:
+            # Use the first (most preferred) backend for this GPU type
+            preferred_backend = preferences[0]
+            gpu_type = backend_to_gpu_env(preferred_backend)
+            logger.debug(f"Auto mode selected {preferred_backend} backend for {detected_gpu_type}")
+    else:
+        # Explicit backend requested
+        gpu_type = backend_to_gpu_env(backend)
+
+        # Validate and warn if backend may not be optimal for detected GPU
+        if detected_gpu_type:
+            preferences = get_gpu_backend_preferences(detected_gpu_type)
+            if preferences and backend not in preferences:
+                gpu_name = detected_gpu_type.replace("_VISIBLE_DEVICES", "")
+                logger.warning(
+                    f"Backend '{backend}' may not be compatible with detected {gpu_name} GPU. "
+                    f"Recommended backends for {gpu_name}: {', '.join(preferences)}"
+                )
 
     if config.runtime == "vllm":
         # Check for GPU-specific VLLM image, with a fallback to the generic one.

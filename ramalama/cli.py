@@ -29,7 +29,7 @@ from ramalama.arg_types import DefaultArgsType
 from ramalama.benchmarks.utilities import print_bench_results
 from ramalama.cli_arg_normalization import normalize_pull_arg
 from ramalama.command.factory import assemble_command
-from ramalama.common import accel_image, exec_cmd, get_accel, perror
+from ramalama.common import accel_image, exec_cmd, get_accel, get_available_backends, perror
 from ramalama.config import (
     GGUF_QUANTIZATION_MODES,
     SUPPORTED_ENGINES,
@@ -1028,6 +1028,13 @@ def runtime_options(parser, command):
             help="IP address to listen",
             completer=suppressCompleter,
         )
+    parser.add_argument(
+        "--backend",
+        dest="backend",
+        default=config.backend,
+        choices=get_available_backends(),
+        help="GPU backend to use (auto, vulkan, rocm, cuda, intel). See man page for details.",
+    )
     parser.add_argument(
         "--image",
         default=default_image(),

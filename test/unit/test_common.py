@@ -114,7 +114,8 @@ DEFAULT_IMAGES = {
         (None, None, f"{DEFAULT_IMAGE}:tag", f"{DEFAULT_IMAGE}:tag"),
         (None, f"{DEFAULT_IMAGE}@sha256:digest", None, f"{DEFAULT_IMAGE}@sha256:digest"),
         (None, None, f"{DEFAULT_IMAGE}@sha256:digest", f"{DEFAULT_IMAGE}@sha256:digest"),
-        ("HIP_VISIBLE_DEVICES", None, None, "quay.io/ramalama/rocm:latest"),
+        # AMD GPU defaults to Vulkan (ramalama image)
+        ("HIP_VISIBLE_DEVICES", None, None, f"{DEFAULT_IMAGE}:latest"),
         ("HIP_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest", None, f"{DEFAULT_IMAGE}:latest"),
         ("HIP_VISIBLE_DEVICES", None, f"{DEFAULT_IMAGE}:latest", f"{DEFAULT_IMAGE}:latest"),
     ],
@@ -151,6 +152,180 @@ image = "{config_override}"
                 parser = create_argument_parser("test_accel_image")
                 configure_subcommands(parser)
                 assert accel_image(config) == expected_result
+
+
+@pytest.mark.parametrize(
+    "backend,gpu_env,expected_result",
+    [
+        # Auto mode: Vulkan for AMD and Intel, CUDA for NVIDIA
+        ("auto", "HIP_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),  # AMD -> Vulkan
+        ("auto", "CUDA_VISIBLE_DEVICES", "quay.io/ramalama/cuda:latest"),  # NVIDIA -> CUDA
+        ("auto", "INTEL_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),  # Intel -> Vulkan
+        # Explicit Vulkan: works for AMD and Intel
+        ("vulkan", "HIP_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),
+        ("vulkan", "INTEL_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),
+        # Explicit vendor backends
+        ("rocm", "HIP_VISIBLE_DEVICES", "quay.io/ramalama/rocm:latest"),
+        ("cuda", "CUDA_VISIBLE_DEVICES", "quay.io/ramalama/cuda:latest"),
+        ("intel", "INTEL_VISIBLE_DEVICES", "quay.io/ramalama/intel-gpu:latest"),
+        # Force backend even with different GPU (warns but allows)
+        ("rocm", "CUDA_VISIBLE_DEVICES", "quay.io/ramalama/rocm:latest"),
+        ("cuda", "HIP_VISIBLE_DEVICES", "quay.io/ramalama/cuda:latest"),
+        ("vulkan", "CUDA_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),  # Vulkan on NVIDIA (not in preferences, warns)
+    ],
+)
+def test_backend_selection(backend: str, gpu_env: str, expected_result: str, monkeypatch):
+    """Test that GPUs use the correct image based on backend config."""
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+    monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
+
+    with NamedTemporaryFile('w', delete_on_close=False) as f:
+        f.write(f"""\
+[ramalama]
+backend = "{backend}"
+            """)
+        f.flush()
+
+        env = {
+            "RAMALAMA_CONFIG": f.name,
+            gpu_env: "1",  # Simulate GPU detection
+        }
+
+        with patch.dict("os.environ", env, clear=True):
+            config = default_config()
+            with patch("ramalama.cli.get_config", return_value=config):
+                default_image.cache_clear()
+                default_rag_image.cache_clear()
+                parser = create_argument_parser("test_backend")
+                configure_subcommands(parser)
+                assert accel_image(config) == expected_result
+
+
+@pytest.mark.parametrize(
+    "backend,gpu_env,expected_result",
+    [
+        # Auto mode on Windows: ROCm for AMD, CUDA for NVIDIA, Intel for Intel
+        ("auto", "HIP_VISIBLE_DEVICES", "quay.io/ramalama/rocm:latest"),  # AMD -> ROCm on Windows
+        ("auto", "CUDA_VISIBLE_DEVICES", "quay.io/ramalama/cuda:latest"),  # NVIDIA -> CUDA
+        ("auto", "INTEL_VISIBLE_DEVICES", "quay.io/ramalama/intel-gpu:latest"),  # Intel -> Intel on Windows
+        # Explicit backends still work
+        ("vulkan", "HIP_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),
+        ("rocm", "HIP_VISIBLE_DEVICES", "quay.io/ramalama/rocm:latest"),
+        ("vulkan", "INTEL_VISIBLE_DEVICES", f"{DEFAULT_IMAGE}:latest"),
+        ("intel", "INTEL_VISIBLE_DEVICES", "quay.io/ramalama/intel-gpu:latest"),
+    ],
+)
+def test_backend_selection_windows(backend: str, gpu_env: str, expected_result: str, monkeypatch):
+    """Test that Windows defaults to vendor-specific backends for AMD and Intel."""
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+    monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    with NamedTemporaryFile('w', delete_on_close=False) as f:
+        f.write(f"""\
+[ramalama]
+backend = "{backend}"
+            """)
+        f.flush()
+
+        env = {
+            "RAMALAMA_CONFIG": f.name,
+            gpu_env: "1",  # Simulate GPU detection
+        }
+
+        with patch.dict("os.environ", env, clear=True):
+            config = default_config()
+            with patch("ramalama.cli.get_config", return_value=config):
+                default_image.cache_clear()
+                default_rag_image.cache_clear()
+                parser = create_argument_parser("test_backend_windows")
+                configure_subcommands(parser)
+                assert accel_image(config) == expected_result
+
+
+def test_backend_incompatibility_warning(monkeypatch, caplog):
+    """Test that warnings are issued for incompatible backend selections."""
+    import logging
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+    monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
+
+    with NamedTemporaryFile('w', delete_on_close=False) as f:
+        f.write("""\
+[ramalama]
+backend = "cuda"
+            """)
+        f.flush()
+
+        env = {
+            "RAMALAMA_CONFIG": f.name,
+            "HIP_VISIBLE_DEVICES": "1",  # AMD GPU detected, but CUDA backend requested
+        }
+
+        with patch.dict("os.environ", env, clear=True):
+            config = default_config()
+            with patch("ramalama.cli.get_config", return_value=config):
+                default_image.cache_clear()
+                default_rag_image.cache_clear()
+                parser = create_argument_parser("test_backend_warning")
+                configure_subcommands(parser)
+
+                with caplog.at_level(logging.WARNING):
+                    result = accel_image(config)
+                    # Should still use the requested backend
+                    assert result == "quay.io/ramalama/cuda:latest"
+                    # But should warn about incompatibility
+                    assert any("may not be compatible" in record.message for record in caplog.records)
+                    assert any("HIP GPU" in record.message for record in caplog.records)
+
+
+@pytest.mark.parametrize(
+    "gpu_env,expected_backends",
+    [
+        ("HIP_VISIBLE_DEVICES", ["auto", "vulkan", "rocm"]),       # AMD
+        ("CUDA_VISIBLE_DEVICES", ["auto", "cuda"]),                # NVIDIA
+        ("INTEL_VISIBLE_DEVICES", ["auto", "vulkan", "intel"]),    # Intel (Vulkan preferred)
+        ("ASAHI_VISIBLE_DEVICES", ["auto", "vulkan"]),             # Asahi
+        (None, ["auto", "vulkan"]),                                # No GPU
+    ],
+)
+def test_get_available_backends(gpu_env: str | None, expected_backends: list[str], monkeypatch):
+    """Test that available backends are correctly returned based on detected GPU."""
+    from ramalama.common import get_available_backends
+
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+
+    env = {}
+    if gpu_env:
+        env[gpu_env] = "1"
+
+    with patch.dict("os.environ", env, clear=True):
+        backends = get_available_backends()
+        assert backends == expected_backends
+
+
+@pytest.mark.parametrize(
+    "gpu_env,expected_backends",
+    [
+        ("HIP_VISIBLE_DEVICES", ["auto", "rocm", "vulkan"]),       # AMD: ROCm preferred on Windows
+        ("CUDA_VISIBLE_DEVICES", ["auto", "cuda"]),                # NVIDIA: same on all platforms
+        ("INTEL_VISIBLE_DEVICES", ["auto", "intel", "vulkan"]),    # Intel: Intel preferred on Windows
+        (None, ["auto", "vulkan"]),                                # No GPU: same on all platforms
+    ],
+)
+def test_get_available_backends_windows(gpu_env: str | None, expected_backends: list[str], monkeypatch):
+    """Test that available backends on Windows prefer vendor-specific backends."""
+    from ramalama.common import get_available_backends
+
+    monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    env = {}
+    if gpu_env:
+        env[gpu_env] = "1"
+
+    with patch.dict("os.environ", env, clear=True):
+        backends = get_available_backends()
+        assert backends == expected_backends
 
 
 @patch("ramalama.common.run_cmd")
