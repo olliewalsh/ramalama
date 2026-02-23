@@ -86,43 +86,6 @@ def get_default_store() -> str:
     return os.path.expanduser("~/.local/share/ramalama")
 
 
-def get_all_inference_spec_dirs(subdir: str) -> list[Path]:
-    ramalama_root = Path(__file__).parent.parent
-    development_spec_dir = ramalama_root / "inference-spec" / subdir
-    all_dirs = [development_spec_dir, *[conf_dir / "inference" for conf_dir in DEFAULT_CONFIG_DIRS]]
-
-    return [d for d in all_dirs if d.exists()]
-
-
-def get_inference_spec_files() -> dict[str, Path]:
-    files: dict[str, Path] = {}
-
-    for spec_dir in get_all_inference_spec_dirs("engines"):
-        # Give preference to .yaml, then .json spec files
-        file_extensions = ["*.yaml", "*.yml", "*.json"]
-        for file_extension in file_extensions:
-            # On naming collisions, i.e. muliple specs for one inference engine, prefer the
-            # spec files discovered later (i.e. user-level > system-level)
-            for spec_file in sorted(Path(spec_dir).glob(file_extension)):
-                file = Path(spec_file)
-                runtime = file.stem
-                files[runtime] = file
-
-    return files
-
-
-def get_inference_schema_files() -> dict[str, Path]:
-    files: dict[str, Path] = {}
-
-    for schema_dir in get_all_inference_spec_dirs("schema"):
-        for spec_file in sorted(Path(schema_dir).glob("schema.*.json")):
-            file = Path(spec_file)
-            version = file.name.replace("schema.", "").replace(".json", "")
-            files[version] = file
-
-    return files
-
-
 def coerce_to_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value

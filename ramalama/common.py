@@ -611,10 +611,6 @@ class AccelImageArgsWithImage(Protocol):
     image: str
 
 
-class AccelImageArgsVLLMRuntime(Protocol):
-    runtime: Literal["vllm"]
-
-
 class AccelImageArgsOtherRuntime(Protocol):
     runtime: str
     container: bool
@@ -628,9 +624,7 @@ class AccelImageArgsOtherRuntimeRAG(Protocol):
     quiet: bool
 
 
-AccelImageArgs: TypeAlias = (
-    None | AccelImageArgsVLLMRuntime | AccelImageArgsOtherRuntime | AccelImageArgsOtherRuntimeRAG
-)
+AccelImageArgs: TypeAlias = None | AccelImageArgsOtherRuntime | AccelImageArgsOtherRuntimeRAG
 
 
 def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_key: str = "image") -> str:
@@ -651,17 +645,15 @@ def accel_image(config: Config, images: RamalamaImageConfig | None = None, conf_
     set_gpu_type_env_vars()
     gpu_type = next(iter(get_gpu_type_env_vars()), "")
 
-    if config.runtime == "vllm":
-        # Check for GPU-specific VLLM image, with a fallback to the generic one.
-        image = None
-        if gpu_type:
-            image = config.images.get(f"VLLM_{gpu_type}")
+    # Delegate image selection to the runtime plugin if it provides one
+    from ramalama.plugins.loader import get_runtime
 
-        if not image:
-            image = config.images.get("VLLM", "docker.io/vllm/vllm-openai")
+    plugin = get_runtime(config.runtime)
+    if plugin is not None:
+        plugin_image = plugin.get_container_image(config, gpu_type)
+        if plugin_image is not None:
+            return plugin_image if ":" in plugin_image else f"{plugin_image}:latest"
 
-        # If the image from the config is specified by tag or digest, return it unmodified
-        return image if ":" in image else f"{image}:latest"
     # Get image based on detected GPU type
     image = images.get(gpu_type, getattr(config, f"default_{conf_key}"))
 

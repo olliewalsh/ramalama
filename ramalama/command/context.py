@@ -96,6 +96,10 @@ class RamalamaModelContext:
         self.dry_run = dry_run
 
     @property
+    def model_name(self) -> str:
+        return self.model.model_name
+
+    @property
     def name(self) -> str:
         return f"{self.model.model_name}:{self.model.model_tag}"
 
