@@ -954,7 +954,6 @@ def chat_parser(subparsers):
 def _rag_args(args):
     args.noout = not args.debug
     rag_args = copy.copy(args)
-    rag_args.subcommand = f"{args.subcommand} --rag"
     rag_args.MODEL = args.rag
     rag_args.image = args.rag_image
     if args.engine == "podman":
