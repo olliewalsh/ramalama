@@ -9,20 +9,6 @@ class RuntimePlugin(ABC):
     @abstractmethod
     def name(self) -> str: ...
 
-    def build_command(self, command: str, args: argparse.Namespace) -> list[str]:
-        """Dispatch to the appropriate _cmd_<command> method.
-
-        Command strings map to method names by replacing '-' with '_',
-        then prefixing with '_cmd_'.  Examples:
-          'run'       → _cmd_run
-          'serve'     → _cmd_serve
-        """
-        method_name = "_cmd_" + command.replace("-", "_")
-        method = getattr(self, method_name, None)
-        if method is None:
-            raise NotImplementedError(f"{self.name} plugin does not implement command '{command}'")
-        return method(args)
-
     def get_container_image(self, config: Any, gpu_type: str) -> str | None:
         return None
 
@@ -41,13 +27,17 @@ class RuntimePlugin(ABC):
         """
         pass
 
+    def handle_subcommand(self, command: str, args: argparse.Namespace) -> list[str]:
+        """Handle the given subcommand. Override in concrete plugins."""
+        raise NotImplementedError(f"{self.name} plugin does not implement handle_subcommand()")
+
     @property
     def health_check_timeout(self) -> int:
         """Seconds to wait for the runtime server to become healthy."""
         return 20
 
     def is_healthy(self, conn: HTTPConnection, args: Any, model_name: str | None = None) -> bool:
-        """Check server health. Override to implement runtime-specific health checks."""
+        """Check service health. Override to implement runtime-specific health checks."""
         raise NotImplementedError(f"Runtime plugin '{self.name}' does not implement is_healthy()")
 
 

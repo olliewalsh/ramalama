@@ -23,4 +23,4 @@ def assemble_command(cli_args: argparse.Namespace) -> list[str]:
     plugin = get_runtime(runtime)
     if plugin is None:
         raise RuntimeError(f"No runtime plugin found for runtime '{runtime}'")
-    return plugin.build_command(command, cli_args)
+    return plugin.handle_subcommand(command, cli_args)
