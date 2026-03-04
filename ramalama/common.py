@@ -640,9 +640,16 @@ def accel_image(config: Config, images: dict[str, str] | None = None, conf_key: 
     "conf_key" is the configuration key that holds the configured value of the selected image.
     If not specified, it defaults to "image".
     """
+
+    should_pull = config.pull in ["always", "missing"] and not config.dryrun
+
     # User provided an image via config
     if config.is_set(conf_key):
-        return tagged_image(getattr(config, conf_key))
+        image_with_tag = tagged_image(getattr(config, conf_key))
+        image, tag = image_with_tag.rsplit(":", 1)
+        if config.engine:
+            ensure_image(config.engine, image, tag, True, should_pull)
+        return image_with_tag
 
     set_gpu_type_env_vars()
     gpu_type = next(iter(get_gpu_type_env_vars()), "")
@@ -666,16 +673,16 @@ def accel_image(config: Config, images: dict[str, str] | None = None, conf_key: 
     vers = minor_release()
 
     should_pull = config.pull in ["always", "missing"] and not config.dryrun
-    if config.engine and attempt_to_use_versioned(config.engine, image, vers, True, should_pull):
+    if config.engine and ensure_image(config.engine, image, vers, True, should_pull):
         return f"{image}:{vers}"
 
     return f"{image}:latest"
 
 
-def attempt_to_use_versioned(conman: str, image: str, vers: str, quiet: bool, should_pull: bool) -> bool:
+def ensure_image(conman: str, image: str, tag: str, quiet: bool, should_pull: bool) -> bool:
     try:
-        # check if versioned image exists locally
-        if run_cmd([conman, "inspect", f"{image}:{vers}"], ignore_all=True):
+        # check if image exists locally
+        if run_cmd([conman, "inspect", f"{image}:{tag}"], ignore_all=True):
             return True
 
     except Exception:
@@ -685,10 +692,10 @@ def attempt_to_use_versioned(conman: str, image: str, vers: str, quiet: bool, sh
         return False
 
     try:
-        # attempt to pull the versioned image
+        # attempt to pull the image
         if not quiet:
-            perror(f"Attempting to pull {image}:{vers} ...")
-        run_cmd([conman, "pull", f"{image}:{vers}"], ignore_stderr=True)
+            perror(f"Attempting to pull {image}:{tag} ...")
+        run_cmd([conman, "pull", f"{image}:{tag}"], ignore_stderr=True)
         return True
 
     except Exception:

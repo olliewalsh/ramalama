@@ -121,7 +121,7 @@ DEFAULT_IMAGES = {
 )
 def test_accel_image(accel_env: str, env_override, config_override: str, expected_result: str, monkeypatch):
     monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
-    monkeypatch.setattr("ramalama.common.attempt_to_use_versioned", lambda *args, **kwargs: False)
+    monkeypatch.setattr("ramalama.common.ensure_image", lambda *args, **kwargs: False)
 
     with NamedTemporaryFile('w', delete_on_close=False) as f:
         cmdline = []
