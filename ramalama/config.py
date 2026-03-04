@@ -304,11 +304,16 @@ def load_env_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     return config
 
 
-def default_config(env: Mapping[str, str] | None = None) -> Config:
-    """Returns a default Config object with all layers initialized."""
-    return Config(load_env_config(env), load_file_config())
+def load_config(env: Mapping[str, str] | None = None) -> Config:
+    """Returns a Config object with layers initialized from config file and environment."""
+    return Config(load_file_config(), load_env_config(env))
 
 
 @lru_cache(maxsize=1)
 def get_config() -> Config:
-    return default_config()
+    return load_config()
+
+
+def default_config() -> Config:
+    """Returns the default Config object with no layer initialized from config file or environment."""
+    return Config()

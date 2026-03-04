@@ -190,14 +190,21 @@ def parse_args_from_cmd(cmd: list[str]) -> tuple[argparse.ArgumentParser, argpar
     # Phase 1: Parse the initial arguments to set CONFIG.runtime etc... as this can affect the subcommands
     initial_parser = get_initial_parser()
     initial_args, _ = initial_parser.parse_known_args(cmd)
-    for arg in initial_args.__dict__.keys():
-        if hasattr(config, arg):
+    for arg in initial_args.__dict__.keys() & config._fields:
+        if getattr(initial_args, arg) != getattr(config, arg, None):
             setattr(config, arg, getattr(initial_args, arg))
 
     # Phase 2: Re-parse the arguments with the subcommands enabled
     parser = get_parser()
     args = parser.parse_args(cmd)
     post_parse_setup(args)
+
+    # TODO: needs refactoring. Update config field that store
+    #       runtime specific config which can be overridden
+    #       via the cli e.g Config.image and Config.rag_image etc...
+    for arg in args.__dict__.keys() & config._fields:
+        if getattr(args, arg) != getattr(config, arg, None):
+            setattr(config, arg, getattr(args, arg))
     return parser, args
 
 
