@@ -294,8 +294,12 @@ class OCI(Transport):
             imageid = "a1b2c3d4e5f6"
         if not imageid.startswith("sha256:"):
             imageid = f"sha256:{imageid}"
+        # Use containers-storage: prefix so podman resolves the image from local
+        # storage rather than attempting a docker.io registry lookup, which can
+        # hang in CI before returning "access denied".
+        local_ref = f"containers-storage:{imageid}"
         try:
-            self._create_manifest(self.model, imageid, args)
+            self._create_manifest(self.model, local_ref, args)
         except subprocess.CalledProcessError as e:
             perror(f"""\
 Failed to create manifest for OCI {self.model} : {e}
