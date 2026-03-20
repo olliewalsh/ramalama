@@ -292,8 +292,6 @@ class OCI(Transport):
         imageid = self.build(source_model, args)
         if args.dryrun:
             imageid = "a1b2c3d4e5f6"
-        if not imageid.startswith("sha256:"):
-            imageid = f"sha256:{imageid}"
         # Use containers-storage: prefix so podman resolves the image from local
         # storage rather than attempting a docker.io registry lookup, which can
         # hang in CI before returning "access denied".
@@ -305,7 +303,7 @@ class OCI(Transport):
 Failed to create manifest for OCI {self.model} : {e}
 Tagging build instead
                 """)
-            self.tag(imageid, self.model, args)
+            self.tag(local_ref, self.model, args)
 
     def convert(self, source_model, args):
         self._convert(source_model, args)
