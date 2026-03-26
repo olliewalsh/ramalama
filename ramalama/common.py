@@ -7,6 +7,7 @@ import os
 import platform
 import random
 import re
+import shlex
 import shutil
 import string
 import subprocess
@@ -120,6 +121,34 @@ def quoted(arr) -> str:
     return " ".join(['"' + element + '"' if ' ' in element else element for element in arr])
 
 
+_PODMAN_WINDOWS_SSH_EXCLUDED = frozenset({"run", "build", "machine"})
+
+
+def _wrap_podman_for_windows_ssh(args: Sequence[str]) -> Sequence[str]:
+    """On Windows with podman, run the command via 'podman machine ssh'.
+
+    This avoids unnecessary data copies between the podman machine VM and the
+    Windows host by running image-related podman commands directly in the VM.
+
+    Subcommands that require host filesystem access (run, build) or machine
+    management (machine) are excluded and continue to use the Windows podman
+    client, which handles path translation.
+    """
+    if platform.system() != "Windows":
+        return args
+    if not args:
+        return args
+    name = os.path.splitext(os.path.basename(str(args[0])))[0].lower()
+    if name != "podman":
+        return args
+    if len(args) > 1 and str(args[1]) in _PODMAN_WINDOWS_SSH_EXCLUDED:
+        return args
+    # Use sh -c with shlex.join so that arguments containing spaces (e.g. Go
+    # template format strings like '{{ .Field }}') are properly quoted for the
+    # remote shell instead of being split into separate tokens.
+    return ["podman", "machine", "ssh", "sh", "-c", shlex.join(list(args))]
+
+
 def exec_cmd(args, stdout2null: bool = False, stderr2null: bool = False):
     logger.debug(f"exec_cmd: {quoted(args)}")
 
@@ -153,6 +182,7 @@ def run_cmd(
     ignore_all: if True, ignore both standard output and standard error
     encoding: encoding to apply to the result text
     """
+    args = _wrap_podman_for_windows_ssh(args)
     logger.debug(f"run_cmd: {quoted(args)}")
     logger.debug(f"Working directory: {cwd}")
     logger.debug(f"Ignore stderr: {ignore_stderr}")
