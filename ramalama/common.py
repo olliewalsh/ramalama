@@ -15,8 +15,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Literal, Optional, Protocol, TypeAlias, TypedDict, cast, get_args
+from typing import IO, TYPE_CHECKING, Any, Literal, Optional, Protocol, TypedDict, cast, get_args
 
+if TYPE_CHECKING:
+    from typing_extensions import TypeAlias
 import yaml
 
 import ramalama.amdkfd as amdkfd

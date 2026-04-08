@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import copy
 from collections.abc import Callable
-from typing import TypeAlias
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeAlias
+
 from urllib.parse import urlparse
 
 from ramalama.arg_types import StoreArgType

@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import json
 import os
 import sys
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, Mapping, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, Mapping
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeAlias
 
 from ramalama.cli_arg_normalization import normalize_pull_arg
 from ramalama.common import apple_vm, available, version_tagged_image

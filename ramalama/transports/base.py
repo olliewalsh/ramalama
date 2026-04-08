@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import os
 import random
@@ -6,7 +8,10 @@ import subprocess
 import sys
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Optional, TypeGuard
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeGuard
 
 from ramalama import chat
 from ramalama.common import ContainerEntryPoint
