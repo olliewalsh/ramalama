@@ -23,8 +23,6 @@ keywords = [
 ]
 dependencies = [
   "argcomplete",
-  "pyyaml",
-  "jsonschema",
   "jinja2",
 ]
 maintainers = [

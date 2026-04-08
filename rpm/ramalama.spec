@@ -8,6 +8,10 @@
 
 %global _python_dist_allow_version_zero 1
 
+%if 0%{?el9}
+%global python3_pkgversion 3.12
+%endif
+
 Name:             %{pypi_name}
 # DO NOT TOUCH the Version string!
 # The TRUE source of this specfile is:
@@ -30,17 +34,13 @@ BuildRequires:    go-md2man
 BuildRequires:    mailcap
 BuildRequires:    make
 BuildRequires:    podman
-BuildRequires:    python3-devel
-BuildRequires:    python3-jsonschema
-BuildRequires:    python3-pytest
-BuildRequires:    python3-jinja2
+BuildRequires:    python%{python3_pkgversion}-devel
+BuildRequires:    python%{python3_pkgversion}-pytest
 
-Provides: python3-ramalama = %{version}-%{release}
-Obsoletes: python3-ramalama < %{version0}-1
+Provides: python%{python3_pkgversion}-ramalama = %{version}-%{release}
+Obsoletes: python%{python3_pkgversion}-ramalama < %{version0}-1
 
 Requires: podman
-Requires: python3-jsonschema
-Requires: python3-jinja2
 
 %description
 %summary

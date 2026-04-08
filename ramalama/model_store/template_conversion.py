@@ -1,13 +1,27 @@
 import re
 from functools import lru_cache
 
-from jinja2 import Environment, meta
+try:
+    from jinja2 import Environment, meta
+
+    has_jinja = True
+except ImportError:
+    has_jinja = False
 
 from ramalama.model_store import go2jinja
 
 
 class TemplateConversionError(Exception):
     pass
+
+
+class JinjaNotAvailableError(TemplateConversionError):
+    pass
+
+
+def check_jinja_availability():
+    if not has_jinja:
+        raise JinjaNotAvailableError("Jinja2 is not available")
 
 
 ROLE_MAP = {
@@ -61,6 +75,7 @@ def wrap_template_with_messages_loop(template: str) -> str:
 
 def get_jinja_variables(template: str) -> set[str]:
     """Returns all variables associated with a jinja template except those explicitly set in the template"""
+    check_jinja_availability()
     env = Environment()
     ast = env.parse(template)
     return meta.find_undeclared_variables(ast)
@@ -78,6 +93,7 @@ def ensure_jinja_openai_compatibility(template: str) -> str:
 
 
 def convert_go_to_jinja(template_str: str) -> str:
+    check_jinja_availability()
     try:
         template = go2jinja.go_to_jinja(template_str)
         template = ensure_jinja_openai_compatibility(template)
