@@ -72,9 +72,9 @@ make docs
 %files -f %{pyproject_files}
 %doc README.md
 %{_bindir}/%{pypi_name}
-%{bash_completions_dir}/%{pypi_name}
-%{fish_completions_dir}/ramalama.fish
-%{zsh_completions_dir}/_ramalama
+%{_datadir}/bash-completion/completions/%{pypi_name}
+%{_datadir}/fish/vendor_completions.d/ramalama.fish
+%{_datadir}/zsh/site-functions/_ramalama
 %dir %{_datadir}/%{pypi_name}
 %{_datadir}/%{pypi_name}/shortnames.conf
 %{_datadir}/%{pypi_name}/ramalama.conf
