@@ -72,10 +72,10 @@ jobs:
           - title: ""
             runs-on: ubuntu-24.04
             uv-options: {}
-          - title: " (python 3.10)"
+          - title: " (python 3.9)"
             runs-on: ubuntu-24.04
             uv-options:
-              python-version: '3.10'
+              python-version: '3.9'
           - title: " (MacOS)"
             runs-on: macos-26
             uv-options: {}
@@ -107,9 +107,9 @@ jobs:
           - title: ""
             uv-options:
               activate-environment: true
-          - title: " (python 3.10)"
+          - title: " (python 3.9)"
             uv-options:
-              python-version: '3.10'
+              python-version: '3.9'
               activate-environment: true
     name: E2E Tests${{ matrix.variant.title }}
     runs-on: ubuntu-24.04
@@ -169,9 +169,9 @@ jobs:
           - title: ""
             uv-options:
               activate-environment: true
-          - title: " (python 3.10)"
+          - title: " (python 3.9)"
             uv-options:
-              python-version: '3.10'
+              python-version: '3.9'
               activate-environment: true
     name: E2E Tests (--no-container)${{ matrix.variant.title }}
     runs-on: ubuntu-24.04
@@ -229,9 +229,9 @@ jobs:
           - title: ""
             uv-options:
               activate-environment: true
-          - title: " (python 3.10)"
+          - title: " (python 3.9)"
             uv-options:
-              python-version: '3.10'
+              python-version: '3.9'
               activate-environment: true
     name: E2E Tests (docker)${{ matrix.variant.title }}
     runs-on: ubuntu-24.04
@@ -309,9 +309,9 @@ jobs:
           - title: ""
             uv-options:
               activate-environment: true
-          - title: " (python 3.10)"
+          - title: " (python 3.9)"
             uv-options:
-              python-version: '3.10'
+              python-version: '3.9'
               activate-environment: true
     name: E2E Tests (MacOS)${{ matrix.variant.title }}
     runs-on: macos-15
@@ -354,9 +354,9 @@ jobs:
           - title: ""
             uv-options:
               activate-environment: true
-          - title: " (python 3.10)"
+          - title: " (python 3.9)"
             uv-options:
-              python-version: '3.10'
+              python-version: '3.9'
               activate-environment: true
     name: E2E Tests (Windows)${{ matrix.variant.title }}
     runs-on: windows-latest

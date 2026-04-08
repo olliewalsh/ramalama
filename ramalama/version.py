@@ -10,3 +10,7 @@ def print_version(args):
         print(version())
     else:
         print("ramalama version %s" % version())
+
+
+if __name__ == "__main__":
+    print(version())

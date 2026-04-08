@@ -10,7 +10,7 @@ set -exo pipefail
 # Note: 
 # cd into ramalama directory so that the version module can be imported individually
 # and additional dependencies such as pyyaml or jsonschema are not required
-VERSION=$(cd ramalama && python3 -c "import version; print(version.version())")
+VERSION=$(python3 "ramalama/version.py")
 
 SPEC_FILE=rpm/ramalama.spec
 
