@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -23,7 +23,7 @@ from ramalama.transports.ollama import Ollama
 from ramalama.transports.rlcr import RamalamaContainerRegistry
 from ramalama.transports.url import URL
 
-CLASS_MODEL_TYPES: TypeAlias = Huggingface | Ollama | OCI | URL | ModelScope | RamalamaContainerRegistry | APITransport
+CLASS_MODEL_TYPES: TypeAlias = Union[Huggingface, Ollama, OCI, URL, ModelScope, RamalamaContainerRegistry, APITransport]
 
 
 class TransportFactory:
@@ -48,7 +48,7 @@ class TransportFactory:
         self._create = _create
 
         self.pruned_model = self.prune_model_input()
-        self.draft_model: Transport | None = None
+        self.draft_model: Optional[Transport] = None
 
         model_draft = getattr(args, "model_draft", None)
         if model_draft:
@@ -173,7 +173,7 @@ class TransportFactory:
         return APITransport(self.pruned_model, provider=get_chat_provider(scheme))
 
 
-def New(name, args, transport: str | None = None) -> CLASS_MODEL_TYPES:
+def New(name, args, transport: Optional[str] = None) -> CLASS_MODEL_TYPES:
     if transport is None:
         transport = ActiveConfig().transport
     return TransportFactory(name, args, transport=transport).create()

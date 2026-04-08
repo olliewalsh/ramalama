@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import copy
 import json
@@ -9,7 +11,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from http.client import HTTPConnection
 from textwrap import dedent
-from typing import Any, get_args
+from typing import Any, Optional, get_args
 from urllib.parse import urlparse
 
 from ramalama import rag as rag_module
@@ -194,7 +196,7 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
             engine.run()
         return f"{source_model.model_name}-{args.gguf}.gguf"
 
-    def service_ready_check(self, conn: HTTPConnection, args: Any, model_name: str | None = None) -> bool:
+    def service_ready_check(self, conn: HTTPConnection, args: Any, model_name: Optional[str] = None) -> bool:
         container_name = f"container {args.name}" if getattr(args, 'container', None) else 'server'
         conn.request("GET", "/health")
         health_resp = conn.getresponse()
@@ -233,7 +235,7 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
         logger.debug(f"{self.name} {container_name} is ready")
         return True
 
-    def get_container_image(self, config: Any, detected_gpu_type: str) -> str | None:
+    def get_container_image(self, config: Any, detected_gpu_type: str) -> Optional[str]:
         backend = config.backend
         if backend == "auto":
             preferences = get_gpu_backend_preferences(detected_gpu_type)

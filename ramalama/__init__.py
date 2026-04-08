@@ -1,5 +1,7 @@
 """ramalama client module."""
 
+from __future__ import annotations
+
 import sys
 
 from ramalama import cli
