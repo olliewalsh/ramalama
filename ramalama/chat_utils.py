@@ -24,21 +24,21 @@ def sanitize_for_terminal(text: str) -> str:
 RoleType = Literal["system", "user", "assistant", "tool"]
 
 
-@dataclass(slots=True)
+@dataclass
 class ImageURLPart:
     url: str
     detail: Optional[str] = None
     type: Literal["image_url"] = "image_url"
 
 
-@dataclass(slots=True)
+@dataclass
 class ImageBytesPart:
     data: bytes
     mime_type: str = "application/octet-stream"
     type: Literal["image_bytes"] = "image_bytes"
 
 
-@dataclass(slots=True)
+@dataclass
 class ToolCall:
     id: str
     name: str
@@ -48,14 +48,14 @@ class ToolCall:
 AttachmentPart = Union[ImageURLPart, ImageBytesPart]
 
 
-@dataclass(slots=True)
+@dataclass
 class SystemMessage:
     role: Literal["system"] = "system"
     text: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class UserMessage:
     role: Literal["user"] = "user"
     text: Optional[str] = None
@@ -63,7 +63,7 @@ class UserMessage:
     attachments: list[AttachmentPart] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass
 class AssistantMessage:
     role: Literal["assistant"] = "assistant"
     text: Optional[str] = None
@@ -72,7 +72,7 @@ class AssistantMessage:
     attachments: list[AttachmentPart] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass
 class ToolMessage:
     text: str
     role: Literal["tool"] = "tool"

@@ -22,7 +22,7 @@ class ChatRequestOptionsDict(RequiredChatRequestOptionsDict, total=False):
     max_tokens: int
 
 
-@dataclass(slots=True)
+@dataclass
 class ChatRequestOptions:
     """Normalized knobs for building a chat completion request."""
 
@@ -50,7 +50,7 @@ class ChatRequestOptions:
         return result
 
 
-@dataclass(slots=True)
+@dataclass
 class ChatStreamEvent:
     """A provider-agnostic representation of a streamed delta."""
 
