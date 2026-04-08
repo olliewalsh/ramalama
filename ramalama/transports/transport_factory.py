@@ -54,35 +54,35 @@ class TransportFactory:
             self.draft_model = draft_model
 
     def detect_model_model_type(self) -> tuple[type[CLASS_MODEL_TYPES], Callable[[], CLASS_MODEL_TYPES]]:
-        match self.model:
-            case model if model.startswith(("huggingface://", "hf://", "hf.co/")):
-                return Huggingface, self.create_huggingface
-            case model if model.startswith(("modelscope://", "ms://")):
-                return ModelScope, self.create_modelscope
-            case model if model.startswith(("ollama://", "ollama.com/library/")):
-                return Ollama, self.create_ollama
-            case model if model.startswith(("oci://", "docker://")):
-                return OCI, self.create_oci
-            case model if model.startswith("rlcr://"):
-                return RamalamaContainerRegistry, self.create_rlcr
-            case model if model.startswith(("http://", "https://", "file:")):
-                return URL, self.create_url
-            case model if model.startswith(("openai://")):
-                return APITransport, self.create_api_transport
+        if self.model.startswith(("huggingface://", "hf://", "hf.co/")):
+            return Huggingface, self.create_huggingface
+        elif self.model.startswith(("modelscope://", "ms://")):
+            return ModelScope, self.create_modelscope
+        elif self.model.startswith(("ollama://", "ollama.com/library/")):
+            return Ollama, self.create_ollama
+        elif self.model.startswith(("oci://", "docker://")):
+            return OCI, self.create_oci
+        elif self.model.startswith("rlcr://"):
+            return RamalamaContainerRegistry, self.create_rlcr
+        elif self.model.startswith(("http://", "https://", "file:")):
+            return URL, self.create_url
+        elif self.model.startswith(("openai://")):
+            return APITransport, self.create_api_transport
 
-        match self.transport:
-            case "huggingface":
-                return Huggingface, self.create_huggingface
-            case "modelscope":
-                return ModelScope, self.create_modelscope
-            case "ollama":
-                return Ollama, self.create_ollama
-            case "rlcr":
-                return RamalamaContainerRegistry, self.create_rlcr
-            case "oci":
-                return OCI, self.create_oci
-
-        raise KeyError(f'transport "{self.transport}" not supported. Must be oci, huggingface, modelscope, or ollama.')
+        if self.transport == "huggingface":
+            return Huggingface, self.create_huggingface
+        elif self.transport == "modelscope":
+            return ModelScope, self.create_modelscope
+        elif self.transport == "ollama":
+            return Ollama, self.create_ollama
+        elif self.transport == "rlcr":
+            return RamalamaContainerRegistry, self.create_rlcr
+        elif self.transport == "oci":
+            return OCI, self.create_oci
+        else:
+            raise KeyError(
+                f'transport "{self.transport}" not supported. Must be oci, huggingface, modelscope, or ollama.'
+            )
 
     def prune_model_input(self) -> str:
 
