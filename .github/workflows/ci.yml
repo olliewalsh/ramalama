@@ -384,6 +384,9 @@ jobs:
       - name: Install Podman
         shell: pwsh
         run: |
+          Write-Host "Winget search podman..."
+          winget search podman
+
           Write-Host "Installing Podman on Windows..."
 
           winget install --accept-source-agreements --silent --disable-interactivity --exact --id RedHat.Podman
