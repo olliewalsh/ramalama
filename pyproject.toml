@@ -73,6 +73,10 @@ dev = [
     "requests"
 ]
 
+openshell = [
+    "openshell",
+]
+
 cov = [
     "ramalama[dev]",
     "pytest-cov",
