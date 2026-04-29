@@ -84,8 +84,7 @@ def run_sandbox(args: SandboxEngineArgsType, agent_cls: type[Agent]):
         if args.workdir:
             if explicit:
                 raise ValueError(
-                    "--workdir is not supported with --sandbox-engine openshell"
-                    " (host directories cannot be mounted)"
+                    "--workdir is not supported with --sandbox-engine openshell (host directories cannot be mounted)"
                 )
             perror("--workdir is not supported with OpenShell sandboxes; falling back to container engine")
             use_openshell = False
