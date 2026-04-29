@@ -117,7 +117,7 @@ def run_sandbox(args: SandboxEngineArgsType, agent_cls: type[Agent]):
     runtime = get_runtime(ActiveConfig().runtime)
     cmd = runtime.handle_subcommand("serve", cast(argparse.Namespace, args))
 
-    model.serve_nonblocking(args, cmd)
+    model.serve_nonblocking(args, cmd)  # type: ignore[union-attr]
 
     agent = agent_cls(args, model.model_alias)
 

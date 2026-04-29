@@ -26,9 +26,9 @@ OPENSHELL_HOST = "host.openshell.internal"
 EXEC_TIMEOUT_SECONDS = 3600
 
 try:
-    import grpc
-    from openshell import SandboxClient, SandboxError
-    from openshell._proto import openshell_pb2, sandbox_pb2
+    import grpc  # type: ignore[import-untyped]
+    from openshell import SandboxClient, SandboxError  # type: ignore[import-not-found]
+    from openshell._proto import openshell_pb2, sandbox_pb2  # type: ignore[import-not-found]
 
     OPENSHELL_AVAILABLE = True
 except ImportError:
@@ -110,7 +110,7 @@ def run_sandbox_openshell(args: SandboxEngineArgsType, agent_cls: type[Agent]) -
     runtime = get_runtime(ActiveConfig().runtime)
     cmd = runtime.handle_subcommand("serve", cast(argparse.Namespace, args))
 
-    model.serve_nonblocking(args, cmd)
+    model.serve_nonblocking(args, cmd)  # type: ignore[union-attr]
 
     agent = agent_cls(args, model.model_alias)
 

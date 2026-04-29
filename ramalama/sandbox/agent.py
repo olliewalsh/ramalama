@@ -74,6 +74,7 @@ def add_sandbox_subparsers(subparsers: argparse._SubParsersAction, img_comp: Cal
 
 class SandboxEngineArgsType(BaseEngineArgsType):
     ARGS: list[str]
+    container: bool
     workdir: Optional[str]
     sandbox_engine: Optional[str]
 
@@ -150,8 +151,8 @@ class Goose(Agent):
 
     def openshell_command(self) -> list[str]:
         args = self.engine.args
-        if args.ARGS:
-            return ["goose", "run", "-t", " ".join(args.ARGS)]
+        if args.ARGS:  # type: ignore[attr-defined]
+            return ["goose", "run", "-t", " ".join(args.ARGS)]  # type: ignore[attr-defined]
         return ["goose", "run", "-i", "-"]
 
     def openshell_image(self) -> str:
@@ -232,8 +233,8 @@ class OpenCode(Agent):
     def openshell_command(self) -> list[str]:
         args = self.engine.args
         cmd = ["opencode", "run", "--thinking=true"]
-        if args.ARGS:
-            cmd.extend(args.ARGS)
+        if args.ARGS:  # type: ignore[attr-defined]
+            cmd.extend(args.ARGS)  # type: ignore[attr-defined]
         return cmd
 
     def openshell_image(self) -> str:

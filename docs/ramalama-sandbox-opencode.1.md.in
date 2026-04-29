@@ -65,6 +65,8 @@ exits, the model server container is automatically stopped and removed.
 
 @@option runtime-args
 
+@@option sandbox-engine
+
 @@option seed
 
 @@option selinux
