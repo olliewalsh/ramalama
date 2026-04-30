@@ -47,9 +47,6 @@ from ramalama.path_utils import file_uri_to_path
 from ramalama.plugins.loader import assemble_command
 from ramalama.plugins.runtimes.inference.common import ContainerizedInferenceRuntimePlugin
 from ramalama.plugins.runtimes.inference.llama_cpp_commands import (
-    _CACHE_REUSE_DEFAULT,
-    _NGL_DEFAULT,
-    _THINKING_DEFAULT,
     LlamaCppCommands,
     _default_threads,
 )
@@ -287,9 +284,8 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
         parser.add_argument(
             "--ngl",
             dest="ngl",
-            type=int,
-            default=_NGL_DEFAULT,
-            help="number of layers to offload to the gpu, if available",
+            default=None,
+            help="number of layers to store in VRAM: a number, 'auto', or 'all' (default: auto)",
             completer=suppressCompleter,
         )
 
@@ -323,7 +319,7 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
             "--cache-reuse",
             dest="cache_reuse",
             type=int,
-            default=_CACHE_REUSE_DEFAULT,
+            default=None,
             help="min chunk size to attempt reusing from the cache via KV shifting",
             completer=suppressCompleter,
         )
@@ -338,7 +334,7 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
             )
             parser.add_argument(
                 "--thinking",
-                default=_THINKING_DEFAULT,
+                default=None,
                 help="enable/disable thinking mode in reasoning models",
                 action=CoerceToBool,
             )

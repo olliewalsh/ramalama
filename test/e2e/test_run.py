@@ -71,8 +71,8 @@ def test_basic_dry_run():
             id="check test_model", marks=skip_if_no_container
         ),
         pytest.param(
-            [], r".*--cache-reuse 256", None, None, True, None,
-            id="check cache-reuse is being set", marks=skip_if_no_container
+            [], r".*--cache-reuse", None, None, False, None,
+            id="check --cache-reuse not passed by default", marks=skip_if_no_container
         ),
         pytest.param(
             [], r".*--ctx-size", None, None, False, None,
@@ -190,8 +190,8 @@ def test_basic_dry_run():
             id="check --ctx-size 4096", marks=skip_if_container,
         ),
         pytest.param(
-            ["--ctx-size", "4096"], r".*--cache-reuse 256.*", None, None, True, None,
-            id="check --cache-reuse is set by default to 256", marks=skip_if_container,
+            ["--ctx-size", "4096"], r".*--cache-reuse", None, None, False, None,
+            id="check --cache-reuse not passed by default", marks=skip_if_container,
         ),
         pytest.param(
             [], r".*-e ASAHI_VISIBLE_DEVICES=99", None, {"ASAHI_VISIBLE_DEVICES": "99"}, True, None,
