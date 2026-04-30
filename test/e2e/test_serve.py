@@ -855,7 +855,7 @@ def test_serve_with_rag():
         assert re.search(r".*llama-server", result_a)
         assert re.search(r".*quay.io/.*-rag(@sha256)?:", result_a)
         assert re.search(r".*rag_framework serve", result_a)
-        assert re.search(r".*--mount=type=image,source=quay.io/ramalama/rag,destination=/rag,rw=true", result_a)
+        assert re.search(r".*--mount=type=image,source=quay.io/ramalama/rag:latest,destination=/rag,rw=true", result_a)
 
         result_b = ctx.check_output(
             [

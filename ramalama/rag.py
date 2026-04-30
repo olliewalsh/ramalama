@@ -170,6 +170,7 @@ class RagTransport(OCI):
     def __init__(self, imodel: Transport, cmd: list[str], args: RagArgsType):
         self.kind = RagSource.DB if os.path.exists(args.rag) else RagSource.IMAGE
         super().__init__(args.rag, args.store, args.engine)
+        args.rag = self.model
         self.imodel = imodel
         self.model_cmd = cmd
 
