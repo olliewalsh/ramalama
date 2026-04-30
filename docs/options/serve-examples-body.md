@@ -213,7 +213,7 @@ spec:
       - name: model-server
 	image: quay.io/ramalama/ramalama:0.8
 	command: ["llama-server"]
-	args: ['--port', '8081', '--model', '/mnt/models/model.file', '--alias', 'quay.io/rhatdan/granite:latest', '--temp', '0.8', '--jinja', '--cache-reuse', '256', '-v', '--threads', 16, '--host', '127.0.0.1']
+	args: ['--port', '8081', '--model', '/mnt/models/model.file', '--alias', 'quay.io/rhatdan/granite:latest', '--temp', '0.8', '--jinja', '-v', '--threads', 16, '--host', '127.0.0.1']
 	securityContext:
 	  allowPrivilegeEscalation: false
 	  capabilities:

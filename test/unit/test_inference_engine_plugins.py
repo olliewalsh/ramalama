@@ -25,19 +25,19 @@ from ramalama.plugins.runtimes.inference.vllm import VllmPlugin
 
 def make_ns(
     container=True,
-    ngl=-1,
+    ngl=None,
     threads=4,
     temp=0.8,
     seed=None,
     ctx_size=0,
-    cache_reuse=256,
+    cache_reuse=None,
     max_tokens=0,
     port="8080",
     host="::",
     logfile=None,
     debug=False,
     webui="on",
-    thinking=True,
+    thinking=None,
     model_draft=None,
     runtime_args=None,
     gguf=None,
@@ -156,7 +156,7 @@ class TestLlamaCppPlugin:
         assert cmd[cmd.index("--model") + 1] == "/mnt/models/model.file"
         assert "--no-warmup" in cmd
         assert "--alias" in cmd
-        assert "-ngl" in cmd
+        assert "-ngl" not in cmd
 
     @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
     def test_serve_nocontainer_uses_configured_host(self, mock_colorize):
@@ -194,15 +194,23 @@ class TestLlamaCppPlugin:
         ns = make_ns(thinking=False)
         cmd = self.plugin.handle_subcommand("serve", ns)
 
-        assert "--reasoning-budget" in cmd
-        assert cmd[cmd.index("--reasoning-budget") + 1] == "0"
+        assert "--reasoning" in cmd
+        assert cmd[cmd.index("--reasoning") + 1] == "off"
 
     @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
     def test_serve_thinking_enabled(self, mock_colorize):
         ns = make_ns(thinking=True)
         cmd = self.plugin.handle_subcommand("serve", ns)
 
-        assert "--reasoning-budget" not in cmd
+        assert "--reasoning" in cmd
+        assert cmd[cmd.index("--reasoning") + 1] == "on"
+
+    @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
+    def test_serve_thinking_default(self, mock_colorize):
+        ns = make_ns(thinking=None)
+        cmd = self.plugin.handle_subcommand("serve", ns)
+
+        assert "--reasoning" not in cmd
 
     @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
     def test_serve_ctx_size(self, mock_colorize):
@@ -242,12 +250,19 @@ class TestLlamaCppPlugin:
         assert cmd[cmd.index("-ngl") + 1] == "40"
 
     @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
-    def test_serve_ngl_negative_uses_999(self, mock_colorize):
+    def test_serve_ngl_negative_uses_all(self, mock_colorize):
         ns = make_ns(ngl=-1)
         cmd = self.plugin.handle_subcommand("serve", ns)
 
         assert "-ngl" in cmd
-        assert cmd[cmd.index("-ngl") + 1] == "999"
+        assert cmd[cmd.index("-ngl") + 1] == "all"
+
+    @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
+    def test_serve_ngl_default_omitted(self, mock_colorize):
+        ns = make_ns()
+        cmd = self.plugin.handle_subcommand("serve", ns)
+
+        assert "-ngl" not in cmd
 
     @patch("ramalama.plugins.runtimes.inference.llama_cpp_commands.should_colorize", return_value=False)
     def test_serve_max_tokens(self, mock_colorize):

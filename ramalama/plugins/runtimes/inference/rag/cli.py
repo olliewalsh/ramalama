@@ -2,7 +2,7 @@
 
 from ramalama.cli import OverrideDefaultAction, default_image, default_rag_image, local_images, suppressCompleter
 from ramalama.plugins.runtimes.inference.llama_cpp import AddPathOrUrl
-from ramalama.plugins.runtimes.inference.llama_cpp_commands import _NGL_DEFAULT, _default_threads
+from ramalama.plugins.runtimes.inference.llama_cpp_commands import _default_threads
 
 
 def register_rag_subcommand(plugin, subparsers):
@@ -64,9 +64,8 @@ def register_rag_subcommand(plugin, subparsers):
     parser.add_argument(
         "--ngl",
         dest="ngl",
-        type=int,
-        default=_NGL_DEFAULT,
-        help="number of layers to offload to the GPU",
+        default=None,
+        help="number of layers to store in VRAM: a number, 'auto', or 'all' (default: auto)",
         completer=suppressCompleter,
     )
     parser.add_argument(

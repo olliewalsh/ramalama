@@ -63,8 +63,9 @@ Print usage message
 OCI container image to use for the llama.cpp inference servers.
 Defaults to the accelerator-appropriate ramalama image.
 
-#### **--ngl**=*integer*
-Number of layers to offload to the GPU, if available (default: -1, auto).
+#### **--ngl**=*value*
+Number of layers to store in VRAM: a number, `auto`, or `all`.
+When omitted, llama-server defaults to `auto`.
 
 #### **--rag-image**=*IMAGE*
 OCI container image for the RAG processing container.
@@ -95,7 +96,7 @@ $ ramalama rag ./report.pdf quay.io/myuser/report-rag
 
 ### Use a custom number of GPU layers
 ```
-$ ramalama rag --ngl 999 ./docs/ my-rag-image
+$ ramalama rag --ngl all ./docs/ my-rag-image
 ```
 
 ## SEE ALSO

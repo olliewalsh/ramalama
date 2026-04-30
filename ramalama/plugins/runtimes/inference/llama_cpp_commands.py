@@ -6,11 +6,6 @@ import os
 from ramalama.console import should_colorize
 from ramalama.transports.transport_factory import New
 
-# llama.cpp-specific defaults — not part of global config
-_NGL_DEFAULT: int = -1
-_CACHE_REUSE_DEFAULT: int = 256
-_THINKING_DEFAULT: bool = True
-
 
 def _default_threads() -> int:
     """Compute the default number of CPU threads for llama.cpp inference."""
@@ -80,8 +75,9 @@ class LlamaCppCommands:
 
         cmd.append("--no-warmup")
 
-        if not getattr(args, 'thinking', None):
-            cmd += ["--reasoning-budget", "0"]
+        thinking = getattr(args, 'thinking', None)
+        if thinking is not None:
+            cmd += ["--reasoning", "on" if thinking else "off"]
 
         if model is not None:
             cmd += ["--alias", model.model_alias]
@@ -104,9 +100,10 @@ class LlamaCppCommands:
         if getattr(args, 'webui', None) == 'off':
             cmd.append("--no-webui")
 
-        ngl = getattr(args, 'ngl', 0)
-        ngl_val = 999 if ngl < 0 else ngl
-        cmd += ["-ngl", str(ngl_val)]
+        ngl = getattr(args, 'ngl', None)
+        if ngl is not None:
+            ngl_str = "all" if ngl == "-1" or ngl == -1 else str(ngl)
+            cmd += ["-ngl", ngl_str]
 
         model_draft = getattr(args, 'model_draft', None)
         if model_draft:
@@ -117,7 +114,8 @@ class LlamaCppCommands:
                     draft_path = draft_model._get_entry_model_path(is_container, should_generate, dry_run)
             if draft_path:
                 cmd += ["--model-draft", draft_path]
-            cmd += ["-ngld", str(ngl_val)]
+            if ngl is not None:
+                cmd += ["-ngld", ngl_str]
 
         threads = getattr(args, 'threads', None)
         if threads is not None:
@@ -159,13 +157,15 @@ class LlamaCppCommands:
             model_path = model._get_entry_model_path(is_container, should_generate, dry_run)
             cmd += ["--model", model_path]
 
-        ngl = getattr(args, 'ngl', 0)
-        ngl_val = 999 if ngl < 0 else ngl
-        cmd += ["-ngl", str(ngl_val)]
+        ngl = getattr(args, 'ngl', None)
+        if ngl is not None:
+            ngl_str = "all" if ngl == "-1" or ngl == -1 else str(ngl)
+            cmd += ["-ngl", ngl_str]
 
         model_draft = getattr(args, 'model_draft', None)
         if model_draft:
-            cmd += ["-ngld", str(ngl_val)]
+            if ngl is not None:
+                cmd += ["-ngld", ngl_str]
 
         threads = getattr(args, 'threads', None)
         if threads is not None:
@@ -186,13 +186,15 @@ class LlamaCppCommands:
             model_path = model._get_entry_model_path(is_container, should_generate, dry_run)
             cmd += ["--model", model_path]
 
-        ngl = getattr(args, 'ngl', 0)
-        ngl_val = 999 if ngl < 0 else ngl
-        cmd += ["-ngl", str(ngl_val)]
+        ngl = getattr(args, 'ngl', None)
+        if ngl is not None:
+            ngl_str = "all" if ngl == "-1" or ngl == -1 else str(ngl)
+            cmd += ["-ngl", ngl_str]
 
         model_draft = getattr(args, 'model_draft', None)
         if model_draft:
-            cmd += ["-ngld", str(ngl_val)]
+            if ngl is not None:
+                cmd += ["-ngld", ngl_str]
 
         threads = getattr(args, 'threads', None)
         if threads is not None:
