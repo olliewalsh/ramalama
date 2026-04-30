@@ -15,7 +15,7 @@ def _make_args(engine="podman"):
         engine=engine,
         dryrun=False,
         quiet=True,
-        goose_image="ghcr.io/block/goose:latest",
+        goose_image="ghcr.io/aaif-goose/goose:latest",
         name="ramalama_model_abc",
         port="8080",
         thinking=False,
@@ -155,7 +155,7 @@ def test_agent_no_workdir(agent):
 def test_goose_default_image():
     """Goose subcommand should provide a default goose image"""
     _, args = parse_args_from_cmd(["sandbox", "goose", TEST_MODEL])
-    assert args.goose_image.startswith("ghcr.io/block/goose:")
+    assert args.goose_image.startswith("ghcr.io/aaif-goose/goose:")
 
 
 def test_goose_custom_image():

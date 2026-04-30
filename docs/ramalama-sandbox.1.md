@@ -12,7 +12,7 @@ in a container. The agent uses the model for reasoning and tool calling.
 
 The *agent* argument selects which AI agent to run. Currently supported agents:
 
-- **goose** - the Goose AI agent (https://github.com/block/goose)
+- **goose** - the Goose AI agent (https://github.com/aaif-goose/goose)
 - **opencode** - the OpenCode AI agent (https://opencode.ai/)
 
 ## OPTIONS

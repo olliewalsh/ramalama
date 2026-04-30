@@ -45,7 +45,7 @@ def add_sandbox_subparsers(subparsers: argparse._SubParsersAction, img_comp: Cal
     parser.add_argument("MODEL", completer=model_comp)
     parser.add_argument(
         "--goose-image",
-        default="ghcr.io/block/goose:1.28.0",
+        default="ghcr.io/aaif-goose/goose:1.33.1",
         completer=img_comp,
         help="Goose container image",
     )
@@ -59,7 +59,7 @@ def add_sandbox_subparsers(subparsers: argparse._SubParsersAction, img_comp: Cal
     parser.add_argument("MODEL", completer=model_comp)
     parser.add_argument(
         "--opencode-image",
-        default="ghcr.io/anomalyco/opencode:1.3.7",
+        default="ghcr.io/anomalyco/opencode:1.14.30",
         completer=img_comp,
         help="OpenCode container image",
     )

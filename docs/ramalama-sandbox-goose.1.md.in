@@ -90,7 +90,7 @@ ramalama sandbox goose qwen3:4b
 
 Run the Goose agent with a custom image:
 ```
-ramalama sandbox goose --goose-image ghcr.io/block/goose:1.27.1 qwen3:4b
+ramalama sandbox goose --goose-image ghcr.io/aaif-goose/goose:1.27.1 qwen3:4b
 ```
 
 Turn off thinking mode in the model the agent is connecting to (may result in faster responses):
