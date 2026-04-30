@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DEFAULT_LLAMA_CPP_COMMIT="15fa3c493bfcd040b5f4dcb29e1c998a0846de16" # b8920
-MESA_VULKAN_VERSION=25.3.6-102.fc43
+MESA_VULKAN_VERSION=25.3.6-102.fc44
 
 dnf_install_intel_gpu() {
   local intel_rpms=("intel-oneapi-mkl-sycl-devel" "intel-oneapi-dnnl-devel"
@@ -39,7 +39,7 @@ dnf_install_cann() {
 dnf_install_rocm() {
   if [ "${ID}" = "fedora" ]; then
     dnf update -y
-    dnf install -y --releasever 44 rocm-core-devel hipblas-devel rocblas-devel rocm-hip-devel rocwmma-devel
+    dnf install -y rocm-core-devel hipblas-devel rocblas-devel rocm-hip-devel rocwmma-devel
   else
     add_stream_repo "AppStream"
     dnf install -y rocm-dev hipblas-devel rocblas-devel rocwmma-dev

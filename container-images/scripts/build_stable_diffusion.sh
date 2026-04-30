@@ -44,6 +44,7 @@ main() {
   common_flags=(
     "-DGGML_STABLE_DIFFUSION=ON" "-DGGML_NATIVE=OFF" "-DGGML_CCACHE=OFF"
     "-DGGML_CMAKE_BUILD_TYPE=Release" "-DCMAKE_INSTALL_PREFIX=/usr"
+    "-DCMAKE_CXX_STANDARD=17" "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
   )
 
   # Build stable diffusion only (no whisper)
