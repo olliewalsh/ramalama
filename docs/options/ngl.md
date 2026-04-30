@@ -3,5 +3,5 @@
 ####> If this file is edited, make sure the changes
 ####> are applicable to all of those.
 #### **--ngl**
-Number of GPU layers: `0` means CPU inferencing, `999` means use max GPU layers.
-Default is `-1`; for llama.cpp backends, negative values are mapped to `999` (max layers).
+Number of layers to store in VRAM: a number, `auto`, or `all`.
+When omitted, llama-server defaults to `auto`.

@@ -14,7 +14,7 @@ from ramalama.common import ensure_image, perror, set_accel_env_vars
 from ramalama.config import ActiveConfig
 from ramalama.plugins.interface import RuntimePlugin
 from ramalama.plugins.loader import assemble_command
-from ramalama.plugins.runtimes.inference.llama_cpp_commands import _NGL_DEFAULT, _default_threads
+from ramalama.plugins.runtimes.inference.llama_cpp_commands import _default_threads
 from ramalama.transports.base import compute_serving_port
 from ramalama.transports.transport_factory import New
 
@@ -40,7 +40,7 @@ def rag_handler(plugin: RuntimePlugin, args: argparse.Namespace) -> None:
 
     # Build serve args for the VLM and embedding servers
     vlm_ctx_size = getattr(args, "ctx_size", 8192)
-    embed_ctx_size = getattr(args, "embed_ctx_size", 8192)
+    embed_ctx_size = getattr(args, "embed_ctx_size", None)
     docling_serve_args = _build_serve_args(
         args, docling_model, docling_port, runtime_args=["--special"], ctx_size=vlm_ctx_size
     )
@@ -110,7 +110,7 @@ def rag_handler(plugin: RuntimePlugin, args: argparse.Namespace) -> None:
         _cleanup_servers(args, docling_serve_args, embed_serve_args, docling_proc, embed_proc)
 
 
-def _build_serve_args(args, model_name, port, runtime_args=None, ctx_size=8192, cache_reuse=256):
+def _build_serve_args(args, model_name, port, runtime_args=None, ctx_size=None, cache_reuse=None):
     """Build argparse.Namespace for an internal llama.cpp serve session."""
     return argparse.Namespace(
         MODEL=model_name,
@@ -140,10 +140,10 @@ def _build_serve_args(args, model_name, port, runtime_args=None, ctx_size=8192, 
         port=str(port),
         ctx_size=ctx_size,
         cache_reuse=cache_reuse,
-        ngl=getattr(args, "ngl", _NGL_DEFAULT),
+        ngl=getattr(args, "ngl", None),
         threads=getattr(args, "threads", _default_threads()),
         temp=0.0,
-        thinking=False,
+        thinking=None,
         max_tokens=0,
         seed=None,
         webui="off",

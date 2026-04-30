@@ -15,7 +15,7 @@ def make_cli_args(**kwargs) -> argparse.Namespace:
         "container": True,
         "generate": None,
         "dryrun": False,
-        "ngl": -1,
+        "ngl": None,
         "threads": 4,
         "temp": 0.8,
         "seed": None,
