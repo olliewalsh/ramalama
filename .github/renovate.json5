@@ -6,6 +6,11 @@
     "ignorePaths": [
         "container-images/common/*.txt"
     ],
+    "lockFileMaintenance": {
+        "schedule": [
+            "* 0-9 * * 1"
+        ]
+    },
     "packageRules": [
         {
             "groupName": "CI updates",
@@ -17,6 +22,6 @@
         }
     ],
     "schedule": [
-        "before 9am on Monday"
+        "* 0-9 * * 1"
     ]
 }
