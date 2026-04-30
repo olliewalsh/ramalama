@@ -81,3 +81,9 @@ class TestRagTransportLocalhostPrefix:
 
         assert rt.kind is RagSource.IMAGE
         assert rt.model == "localhost/myrag:latest"
+
+    def test_bare_name_syncs_args_rag(self, tmp_path: Path, force_oci_image: None) -> None:
+        args = Namespace(rag="myrag", store=str(tmp_path / "store"), engine="podman")
+        RagTransport(imodel=MagicMock(), cmd=[], args=args)
+
+        assert args.rag == "localhost/myrag:latest"
