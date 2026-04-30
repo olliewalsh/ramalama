@@ -69,6 +69,18 @@ pull() {
     exec_color "ramalama ls | grep --color smollm:135m"
     echo ""
 
+    echo_color "Remove qwen2.5vl:3b model if previously pulled"
+    exec_color "ramalama rm --ignore qwen2.5vl:3b"
+    echo ""
+
+    echo_color "RamaLama Pulling Ollama Image qwen2.5vl:3b"
+    exec_color "ramalama pull qwen2.5vl:3b"
+    echo ""
+
+    echo_color "RamaLama List all AI Models in local store"
+    exec_color "ramalama ls | grep --color qwen2.5vl:3b"
+    echo ""
+
     echo_color "Show RamaLama container images"
     exec_color "podman images | grep ramalama"
     echo ""
@@ -184,8 +196,12 @@ quadlet() {
 }
 
 multi-modal() {
-    echo_color "Serve smolvlm via RamaLama model service"
-    exec_color "ramalama serve --port 8080 --name multi-modal -d smolvlm"
+    echo_color "Serve qwen2.5vl:3b via RamaLama model service"
+    exec_color "ramalama serve --port 8080 --name multi-modal -d qwen2.5vl:3b"
+    echo ""
+
+    echo_color "Waiting for the model service to come up"
+    exec_color "timeout 60 bash -c 'until curl -s -f -o /dev/null http://localhost:8080/v1/models; do sleep 2; done'"
     echo ""
 
     echo_color "Use web browser to show interaction"
