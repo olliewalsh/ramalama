@@ -3,4 +3,5 @@
 ####> If this file is edited, make sure the changes
 ####> are applicable to all of those.
 #### **--cache-reuse**=*BYTES*
-Minimum chunk size (in bytes) to attempt reusing from the cache via KV shifting. (default: 256)
+Minimum chunk size (in bytes) to attempt reusing from the cache via KV shifting.
+When omitted, llama-server uses its built-in default.

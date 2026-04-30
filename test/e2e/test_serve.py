@@ -76,8 +76,8 @@ def test_basic_dry_run():
             id="check default --name flag", marks=skip_if_no_container
         ),
         pytest.param(
-            [], r".*--cache-reuse 256", None, None, True,
-            id="check --cache-reuse default value (256)", marks=skip_if_no_container
+            [], r".*--cache-reuse", None, None, False,
+            id="check --cache-reuse not passed by default", marks=skip_if_no_container
         ),
         pytest.param(
             [], r".*--no-webui", None, None, False,
@@ -179,8 +179,8 @@ def test_basic_dry_run():
             id="check default --host value", marks=skip_if_container
         ),
         pytest.param(
-            [], r".*--cache-reuse 256", None, None, True,
-            id="check --cache-reuse default value", marks=skip_if_container
+            [], r".*--cache-reuse", None, None, False,
+            id="check --cache-reuse not passed by default", marks=skip_if_container
         ),
         pytest.param(
             ["--host", "127.0.0.1"],
@@ -209,12 +209,16 @@ def test_basic_dry_run():
             id="check --runtime-args=\"--foo='a b c'\""
         ),
         pytest.param(
-            ["--thinking", "False"], r".*--reasoning-budget 0", None, None, True,
-            id="check --reasoning-budget 0 passed to runtime",
+            ["--thinking", "False"], r".*--reasoning off", None, None, True,
+            id="check --reasoning off passed to runtime",
         ),
         pytest.param(
-            [], r".*--reasoning-budget", None, None, False,
-            id="check --reasoning-budget not passed by default",
+            ["--thinking", "True"], r".*--reasoning on", None, None, True,
+            id="check --reasoning on passed to runtime",
+        ),
+        pytest.param(
+            [], r".*--reasoning", None, None, False,
+            id="check --reasoning not passed by default",
         ),
     ],
 )
