@@ -23,6 +23,9 @@ spec:
     value: '{{revision}}'
   - name: output-image
     value: quay.io/redhat-user-workloads/ramalama-tenant/remoting:{{revision}}
+  - name: build-platforms
+    value:
+    - linux-d160-m4xlarge/arm64
   - name: dockerfile
     value: container-images/remoting/Containerfile
   pipelineRef:
