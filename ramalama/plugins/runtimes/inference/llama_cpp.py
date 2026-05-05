@@ -7,10 +7,10 @@ import os
 import platform
 import shutil
 import tempfile
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from http.client import HTTPConnection
-from typing import Any, Optional, get_args
+from typing import Any, Literal, Optional, get_args
 from urllib.parse import urlparse
 
 from ramalama.benchmarks.manager import BenchmarksManager
@@ -40,7 +40,7 @@ from ramalama.common import (
     set_gpu_type_env_vars,
     version_tagged_image,
 )
-from ramalama.config import GGUF_QUANTIZATION_MODES, ActiveConfig, DefaultConfig
+from ramalama.config import ActiveConfig, DefaultConfig, coerce_to_bool
 from ramalama.engine import Engine, dry_run, image_inspect
 from ramalama.logger import logger
 from ramalama.path_utils import file_uri_to_path
@@ -54,6 +54,43 @@ from ramalama.rag import RagTransport
 from ramalama.transports.api import APITransport
 from ramalama.transports.base import compute_serving_port
 from ramalama.transports.transport_factory import New, TransportFactory
+
+GGUF_QUANTIZATION_MODES = Literal[
+    "Q2_K",
+    "Q3_K_S",
+    "Q3_K_M",
+    "Q3_K_L",
+    "Q4_0",
+    "Q4_K_S",
+    "Q4_K_M",
+    "Q5_0",
+    "Q5_K_S",
+    "Q5_K_M",
+    "Q6_K",
+    "Q8_0",
+]
+DEFAULT_GGUF_QUANTIZATION_MODE: GGUF_QUANTIZATION_MODES = "Q4_K_M"  # type: ignore[assignment]
+
+
+@dataclass
+class LlamaCppConfig:
+    backend: Literal["auto", "vulkan", "rocm", "cuda", "sycl", "openvino", "cann", "musa"] = "auto"
+    cache_reuse: Optional[int] = None
+    gguf_quantization_mode: GGUF_QUANTIZATION_MODES = DEFAULT_GGUF_QUANTIZATION_MODE  # type: ignore[assignment]
+    ngl: Optional[str] = None
+    temp: float = 0.8
+    thinking: Optional[bool] = None
+    threads: int = field(default_factory=_default_threads)
+
+    def __post_init__(self):
+        if self.cache_reuse is not None:
+            self.cache_reuse = int(self.cache_reuse)
+        if self.ngl is not None:
+            self.ngl = str(self.ngl)
+        self.temp = float(self.temp)
+        self.threads = int(self.threads)
+        if self.thinking is not None:
+            self.thinking = coerce_to_bool(self.thinking)
 
 
 class AddPathOrUrl(argparse.Action):
@@ -134,6 +171,8 @@ _LLAMA_CPP_IMAGES: dict[str, str] = {
 
 
 class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
+    config_type = LlamaCppConfig
+
     @property
     def name(self) -> str:
         return "llama.cpp"
@@ -231,7 +270,8 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
         return True
 
     def get_container_image(self, config: Any, detected_gpu_type: str) -> Optional[str]:
-        backend = config.backend
+        rt_config = self.get_runtime_config(config)
+        backend = rt_config.backend
         if backend == "auto":
             preferences = get_gpu_backend_preferences(detected_gpu_type)
             if preferences:
@@ -271,13 +311,13 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
     # --- subcommand registration ---
 
     def _add_backend_arg(self, parser: "argparse.ArgumentParser") -> None:
-        config = ActiveConfig()
+        rt_config = self.get_runtime_config(ActiveConfig())
         parser.add_argument(
             "--backend",
             dest="backend",
-            default=config.backend,
+            default=rt_config.backend,
             choices=get_available_backends(),
-            help="GPU backend to use (auto, vulkan, rocm, cuda, sycl, openvino). See man page for details.",
+            help="GPU backend to use (auto, vulkan, rocm, cuda, sycl, openvino, cann, musa). See man page for details.",
         )
 
     def _add_ngl_arg(self, parser: "argparse.ArgumentParser") -> None:
@@ -290,14 +330,15 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
         )
 
     def _add_threads_arg(self, parser: "argparse.ArgumentParser") -> None:
-        def_threads = _default_threads()
+        rt_config = self.get_runtime_config(ActiveConfig())
         parser.add_argument(
             "-t",
             "--threads",
             type=int,
-            default=def_threads,
+            default=rt_config.threads,
             help=(
-                f"number of cpu threads to use, the default is {def_threads} on this system, -1 means use this default"
+                f"number of cpu threads to use, the default is {rt_config.threads} on this system,"
+                " -1 means use this default"
             ),
             completer=suppressCompleter,
         )
@@ -305,12 +346,12 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
     def _add_inference_args(self, parser: "argparse.ArgumentParser", command: str) -> None:
         """Add llama.cpp-specific inference args to an already-created parser."""
         super()._add_inference_args(parser, command)
-        config = ActiveConfig()
+        rt_config = self.get_runtime_config(ActiveConfig())
         parser.add_argument(
             "--temp",
             dest="temp",
             type=float,
-            default=config.temp,
+            default=rt_config.temp,
             help="temperature of the response from the AI model",
             completer=suppressCompleter,
         )
@@ -498,6 +539,7 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
 
         # convert
         config = ActiveConfig()
+        rt_config = self.get_runtime_config(config)
         convert_parser = subparsers.add_parser(
             "convert",
             help="convert AI Model from local storage to OCI Image",
@@ -508,9 +550,9 @@ class LlamaCppPlugin(LlamaCppCommands, ContainerizedInferenceRuntimePlugin):
             "--gguf",
             choices=get_args(GGUF_QUANTIZATION_MODES),
             nargs="?",
-            const=config.gguf_quantization_mode,
+            const=rt_config.gguf_quantization_mode,
             default=None,
-            help=f"GGUF quantization format. If specified without value, {config.gguf_quantization_mode} is used.",
+            help=f"GGUF quantization format. If specified without value, {rt_config.gguf_quantization_mode} is used.",
         )
         add_network_argument(convert_parser)
         convert_parser.add_argument(

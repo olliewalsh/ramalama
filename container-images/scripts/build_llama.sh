@@ -167,9 +167,7 @@ dnf_install_runtime_deps() {
   fi
 
   if [ ${#runtime_pkgs[@]} -gt 0 ]; then
-    local enablerepo_flag=""
-    [ "$containerfile" = "openvino" ] && enablerepo_flag="--enablerepo=updates-testing"
-    dnf install -y $enablerepo_flag --setopt=install_weak_deps=false "${runtime_pkgs[@]}"
+    dnf install -y --setopt=install_weak_deps=false "${runtime_pkgs[@]}"
   fi
   dnf -y clean all
 }
