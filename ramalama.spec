@@ -5,11 +5,16 @@ PyInstaller spec file for building standalone RamaLama executable on macOS.
 This creates a single executable that includes Python and all dependencies,
 eliminating the need for users to install Python separately.
 
+Install the package first so entry-point metadata is available (copy_metadata):
+  pip install .
+
 Build with: pyinstaller ramalama.spec
 """
 
 import sys
 from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 # Import version dynamically
 sys.path.insert(0, str(Path.cwd() / 'ramalama'))
@@ -17,6 +22,10 @@ from version import version as get_version
 
 # Get the project root directory
 project_root = Path.cwd()
+sys.path.insert(0, str(project_root))
+
+# Every submodule under ramalama (plugins, transports, etc.) for PyInstaller analysis.
+_ramalama_hiddenimports = collect_submodules('ramalama')
 
 # Get version dynamically
 app_version = get_version()
@@ -39,26 +48,10 @@ a = Analysis(
         ('docs/*.1', 'share/man/man1'),
         ('docs/*.5', 'share/man/man5'),
         ('docs/*.7', 'share/man/man7'),
-    ],
-    hiddenimports=[
-        'ramalama',
-        'ramalama.cli',
-        'ramalama.version',
-        'ramalama.common',
-        'ramalama.config',
-        'ramalama.engine',
-        'ramalama.kube',
-        'ramalama.quadlet',
-        'ramalama.rag',
-        'ramalama.stack',
-        'ramalama.chat',
-        'ramalama.compose',
-        'ramalama.http_client',
-        'ramalama.daemon',
-        'ramalama.mcp',
-        'ramalama.model_store',
-        'ramalama.transports',
-        'ramalama.file_loaders',
+    ]
+    + copy_metadata('ramalama'),  # dist metadata for importlib.metadata.entry_points (runtime plugins)
+    hiddenimports=_ramalama_hiddenimports
+    + [
         'argcomplete',
         'yaml',
         'jinja2',

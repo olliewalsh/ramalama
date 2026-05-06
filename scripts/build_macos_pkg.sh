@@ -57,6 +57,10 @@ rm -rf "$PROJECT_ROOT/dist"
 rm -rf "$PROJECT_ROOT/build"
 mkdir -p "$BUILD_DIR"
 
+# Install package so PyInstaller can bundle distribution metadata (entry points) via copy_metadata.
+echo "Installing RamaLama package (required for PyInstaller)..."
+pip3 install "$PROJECT_ROOT"
+
 # Build app bundle with PyInstaller
 echo "Building app bundle..."
 cd "$PROJECT_ROOT"
