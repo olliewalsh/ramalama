@@ -24,8 +24,6 @@ URL:              %{forgeurl}
 Source:           %{forgesource}
 BuildArch:        noarch
 
-# golang is required for docs
-BuildRequires:    golang
 BuildRequires:    go-md2man
 BuildRequires:    mailcap
 BuildRequires:    make
