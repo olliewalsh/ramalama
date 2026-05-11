@@ -95,11 +95,11 @@ To make it easier for users, RamaLama uses shortname files, which contain aliase
 $ cat /usr/share/ramalama/shortnames.conf
 [shortnames]
   "tiny" = "hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF"
-  "granite" = "huggingface://instructlab/granite-7b-lab-GGUF/granite-7b-lab-Q4_K_M.gguf"
-  "granite:7b" = "huggingface://instructlab/granite-7b-lab-GGUF/granite-7b-lab-Q4_K_M.gguf"
-  "ibm/granite" = "huggingface://instructlab/granite-7b-lab-GGUF/granite-7b-lab-Q4_K_M.gguf"
-  "merlinite" = "huggingface://instructlab/merlinite-7b-lab-GGUF/merlinite-7b-lab-Q4_K_M.gguf"
-  "merlinite:7b" = "huggingface://instructlab/merlinite-7b-lab-GGUF/merlinite-7b-lab-Q4_K_M.gguf"
+  "granite" = "hf://ibm-granite/granite-3.3-8b-instruct-GGUF"
+  "granite:7b" = "hf://instructlab/granite-7b-lab-GGUF"
+  "ibm/granite" = "hf://ibm-granite/granite-3.3-8b-instruct-GGUF"
+  "merlinite" = "hf://instructlab/merlinite-7b-lab-GGUF"
+  "merlinite:7b" = "hf://instructlab/merlinite-7b-lab-GGUF"
 ...
 ```
 
