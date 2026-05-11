@@ -66,7 +66,9 @@ RamaLama supports multiple AI model registries types called transports. Supporte
 | OCI Container Registries | oci://                        | [`opencontainers.org`](https://opencontainers.org) |
 |                          |                               | Examples: [`quay.io`](https://quay.io), [`Docker Hub`](https://docker.io), [`Artifactory`](https://artifactory.com) |
 
-RamaLama defaults to the Ollama registry transport. This default can be overridden in the `ramalama.conf` file or via the `RAMALAMA_TRANSPORT` environment variable. Running `export RAMALAMA_TRANSPORT=huggingface` changes RamaLama to use the HuggingFace transport.
+Models specified in the Hugging Face `<org>/<model>` format are automatically pulled from Hugging Face. For models specified without an organization (e.g. `granite-code`), RamaLama currently defaults to the Ollama transport. **Note:** Ollama models are no longer compatible with llama.cpp, and support for the Ollama transport will be removed in a future release. Users should migrate to Hugging Face models.
+
+The default transport can be overridden in the `ramalama.conf` file or via the `RAMALAMA_TRANSPORT` environment variable. Running `export RAMALAMA_TRANSPORT=huggingface` changes RamaLama to use the HuggingFace transport.
 
 Modify individual model transports by specifying the `huggingface://`, `oci://`, `ollama://`, `https://`, `http://`, `file://` prefix to the model.
 
@@ -92,7 +94,7 @@ To make it easier for users, RamaLama uses shortname files, which contain aliase
 ```toml
 $ cat /usr/share/ramalama/shortnames.conf
 [shortnames]
-  "tiny" = "ollama://tinyllama"
+  "tiny" = "hf://TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF"
   "granite" = "huggingface://instructlab/granite-7b-lab-GGUF/granite-7b-lab-Q4_K_M.gguf"
   "granite:7b" = "huggingface://instructlab/granite-7b-lab-GGUF/granite-7b-lab-Q4_K_M.gguf"
   "ibm/granite" = "huggingface://instructlab/granite-7b-lab-GGUF/granite-7b-lab-Q4_K_M.gguf"

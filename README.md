@@ -271,7 +271,8 @@ RamaLama supports multiple AI model registries types called transports.
 |                          |Examples: [`quay.io`](https://quay.io),  [`Docker Hub`](https://docker.io), [`Pulp`](https://pulpproject.org), and [`Artifactory`](https://jfrog.com/artifactory/)|
 
 ### Default Transport
-RamaLama uses the Ollama registry transport by default
+
+Models specified in the Hugging Face `<org>/<model>` format are automatically pulled from Hugging Face. For models specified without an organization (e.g. `granite-code`), RamaLama currently defaults to the Ollama transport. **Note:** Ollama models are no longer compatible with llama.cpp, and support for the Ollama transport will be removed in a future release. Users should migrate to Hugging Face models.
 
 <details>
 <summary>
