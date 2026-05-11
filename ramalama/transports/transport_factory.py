@@ -40,7 +40,7 @@ class TransportFactory:
 
         self.model = model
         self.store_path = args.store
-        self._transport_is_default = transport is None
+        self._transport_is_implicit = transport is None and not model.startswith("ollama://")
         self.transport = transport if transport is not None else "ollama"
         self.engine = args.engine
         self.ignore_stderr = ignore_stderr
@@ -68,7 +68,7 @@ class TransportFactory:
             return Huggingface, self.create_huggingface
         if self.model.startswith(("modelscope://", "ms://")):
             return ModelScope, self.create_modelscope
-        if self.model.startswith(("ollama://", "ollama.com/library/")):
+        if self.model.startswith("ollama://"):
             self._warn_ollama_deprecated()
             return Ollama, self.create_ollama
         if self.model.startswith(("oci://", "docker://")):
@@ -79,7 +79,7 @@ class TransportFactory:
             return URL, self.create_url
         if self.model.startswith(("openai://")):
             return APITransport, self.create_api_transport
-        if self._transport_is_default and "/" in self.model:
+        if self._transport_is_implicit and "/" in self.model:
             return Huggingface, self.create_huggingface
         if self.transport == "huggingface":
             return Huggingface, self.create_huggingface
@@ -94,13 +94,13 @@ class TransportFactory:
             return OCI, self.create_oci
         raise KeyError(f'transport "{self.transport}" not supported. Must be oci, huggingface, modelscope, or ollama.')
 
-    def _warn_ollama_deprecated(self):
+    def _warn_ollama_deprecated(self) -> None:
         global _ollama_default_warned
         if _ollama_default_warned:
             return
         _ollama_default_warned = True
         msg = ""
-        if self._transport_is_default:
+        if self._transport_is_implicit:
             msg = f"Defaulting to Ollama transport for '{self.model}'.\n"
         warnings.warn(
             f"{msg}Note: Ollama models are no longer compatible with llama.cpp. "
@@ -124,7 +124,7 @@ class TransportFactory:
         elif self.model_cls == ModelScope:
             pruned_model_input = rm_until_substring(pruned_model_input, "modelscope.cn/")
         elif self.model_cls == Ollama:
-            pruned_model_input = rm_until_substring(pruned_model_input, "ollama.com/library/")
+            pruned_model_input = rm_until_substring(pruned_model_input, "library/")
 
         return pruned_model_input
 

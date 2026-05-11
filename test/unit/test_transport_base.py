@@ -69,7 +69,7 @@ def force_oci_artifact(monkeypatch):
             "2b-instruct-fp16",
             "ollama.com/huihui_ai",
         ),
-        ("ollama.com/library/granite-code", "granite-code", "latest", "library"),
+        ("ollama://library/granite-code", "granite-code", "latest", "library"),
         (
             "huihui_ai/granite3.1-dense-abliterated:2b-instruct-fp16",
             "granite3.1-dense-abliterated",
