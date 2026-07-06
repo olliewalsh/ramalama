@@ -238,30 +238,43 @@ class ImageCaptioner:
         return choices[0]["message"]["content"]
 
 
+def _picture_has_content_children(picture):
+    """True when a picture contains layout/OCR text, not just captions."""
+    caption_refs = {r.cref for r in picture.captions}
+    return any(child.cref not in caption_refs for child in picture.children)
+
+
 def _docling_doc_to_text(doc, SectionHeaderItem, TitleItem, captioner=None):
     """Serialize a DoclingDocument to markdown-like text for chunking."""
-    from docling_core.types.doc.document import PictureItem
+    from docling_core.types.doc.document import ListItem, PictureItem, TableItem
 
     parts = []
-    for item, _level in doc.iterate_items():
+    for item, level in doc.iterate_items(traverse_pictures=True):
         if isinstance(item, (TitleItem, SectionHeaderItem)):
             if item.text:
-                parts.append(f"\n{'#' * min(_level + 1, 6)} {item.text.strip()}\n")
-        elif isinstance(item, PictureItem) and captioner and item.image:
+                parts.append(f"\n{'#' * min(level + 1, 6)} {item.text.strip()}\n")
+        elif isinstance(item, TableItem):
+            table_md = item.export_to_markdown(doc=doc).strip()
+            if table_md:
+                parts.append(table_md)
+        elif isinstance(item, PictureItem):
             description = None
-            try:
-                pil_image = item.image.pil_image
-                if pil_image:
-                    description = captioner.caption(pil_image)
-            except Exception as e:
-                logger.warning("Failed to caption image: %s", e)
+            if item.meta and item.meta.description and item.meta.description.text:
+                description = item.meta.description.text.strip()
+            elif captioner and item.image and not _picture_has_content_children(item):
+                try:
+                    pil_image = item.image.pil_image
+                    if pil_image:
+                        description = captioner.caption(pil_image)
+                except Exception as e:
+                    logger.warning("Failed to caption image: %s", e)
 
             if description:
-                parts.append(f"\n[Image: {description.strip()}]\n")
-            elif getattr(item, "text", None):
-                text = item.text.strip()
-                if text:
-                    parts.append(text)
+                parts.append(f"\n[Image: {description}]\n")
+        elif isinstance(item, ListItem):
+            text = item.text.strip()
+            if text:
+                parts.append(f"{item.marker} {text}")
         elif hasattr(item, "text") and item.text:
             text = item.text.strip()
             if text:
@@ -338,6 +351,8 @@ def store_in_qdrant(chunks, ids, doc_ids, chunk_indices, output_dir, embedder, e
     output_dir.mkdir(parents=True, exist_ok=True)
 
     vectors = embedder.embed(chunks)
+    if not vectors:
+        raise ValueError("Embedding server returned no vectors")
     dim = embedder.dimension
 
     qclient = qdrant_client.QdrantClient(path=str(output_dir))
@@ -515,6 +530,11 @@ def run_pipeline(args):
     if captioner and captioner.count > 0:
         sys.stderr.write("\n")
     perror(f"  {len(chunks)} chunks created")
+    if not chunks:
+        raise ValueError(
+            "No text chunks were produced from the documents. "
+            "Check that conversion produced readable text."
+        )
 
     # Embed and store
     if not args.embed_url:
