@@ -87,6 +87,9 @@ jobs:
           - title: " (MacOS)"
             runs-on: macos-26
             uv-options: {}
+          - title: " (MacOS Intel)"
+            runs-on: macos-26-intel
+            uv-options: {}
     name: Unit Tests${{ matrix.variant.title }}
     runs-on: ${{ matrix.variant.runs-on }}
     timeout-minutes: 20
@@ -331,6 +334,53 @@ jobs:
               activate-environment: true
     name: E2E Tests (MacOS)${{ matrix.variant.title }}
     runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with: ${{ matrix.variant.uv-options }}
+
+      - name: install requirements
+        shell: bash
+        run: |
+          brew install go bash jq llama.cpp shellcheck podman
+          uv tool install tox --with tox-uv
+          uv run -- make install-requirements
+
+      - name: install ollama
+        shell: bash
+        run: ./.github/scripts/install-ollama.sh
+
+      - name: run e2e-tests-nocontainer
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          make e2e-tests-nocontainer
+
+  e2e-tests-macos-intel:
+    if: |
+      github.event_name == 'pull_request' ||
+      github.ref == 'refs/heads/main' ||
+      github.repository_owner != 'containers'
+    needs:
+      - lint
+      - unit-test
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - title: ""
+            uv-options:
+              activate-environment: true
+          - title: " (python 3.9)"
+            uv-options:
+              python-version: '3.9'
+              activate-environment: true
+    name: E2E Tests (MacOS Intel)${{ matrix.variant.title }}
+    runs-on: macos-26-intel
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
