@@ -160,8 +160,6 @@ def chunk_documents(docs, max_tokens=400, captioner=None):
     import semchunk
     import tiktoken
 
-    from docling_core.types.doc.document import SectionHeaderItem, TitleItem
-
     encoding = tiktoken.get_encoding("cl100k_base")
     token_counter = lambda text: len(encoding.encode(text))  # noqa: E731
     chunks, ids, doc_ids, chunk_indices = [], [], [], []
@@ -170,7 +168,7 @@ def chunk_documents(docs, max_tokens=400, captioner=None):
         if isinstance(doc, str):
             text = doc
         else:
-            text = _docling_doc_to_text(doc, SectionHeaderItem, TitleItem, captioner=captioner)
+            text = _docling_doc_to_text(doc, captioner=captioner)
 
         if not text.strip():
             continue
@@ -244,42 +242,52 @@ def _picture_has_content_children(picture):
     return any(child.cref not in caption_refs for child in picture.children)
 
 
-def _docling_doc_to_text(doc, SectionHeaderItem, TitleItem, captioner=None):
-    """Serialize a DoclingDocument to markdown-like text for chunking."""
-    from docling_core.types.doc.document import ListItem, PictureItem, TableItem
+def _docling_doc_has_content(doc):
+    """True when a DoclingDocument has extractable text or captionable images."""
+    if any(t.text.strip() for t in doc.texts):
+        return True
+    if doc.tables or doc.key_value_items or doc.form_items:
+        return True
+    return any(pic.get_image(doc=doc) is not None for pic in doc.pictures)
 
-    parts = []
-    for item, level in doc.iterate_items(traverse_pictures=True):
-        if isinstance(item, (TitleItem, SectionHeaderItem)):
-            if item.text:
-                parts.append(f"\n{'#' * min(level + 1, 6)} {item.text.strip()}\n")
-        elif isinstance(item, TableItem):
-            table_md = item.export_to_markdown(doc=doc).strip()
-            if table_md:
-                parts.append(table_md)
-        elif isinstance(item, PictureItem):
-            description = None
-            if item.meta and item.meta.description and item.meta.description.text:
-                description = item.meta.description.text.strip()
-            elif captioner and item.image and not _picture_has_content_children(item):
-                try:
-                    pil_image = item.image.pil_image
-                    if pil_image:
-                        description = captioner.caption(pil_image)
-                except Exception as e:
-                    logger.warning("Failed to caption image: %s", e)
 
-            if description:
-                parts.append(f"\n[Image: {description}]\n")
-        elif isinstance(item, ListItem):
-            text = item.text.strip()
-            if text:
-                parts.append(f"{item.marker} {text}")
-        elif hasattr(item, "text") and item.text:
-            text = item.text.strip()
-            if text:
-                parts.append(text)
-    return "\n".join(parts)
+def _docling_doc_to_text(doc, captioner=None):
+    """Serialize a DoclingDocument to plain text for chunking."""
+    from docling_core.types.doc.document import PictureItem
+
+    text = doc.export_to_text(traverse_pictures=True).strip()
+    if logger.isEnabledFor(logging.DEBUG) and not text:
+        for item, level in doc.iterate_items(traverse_pictures=True):
+            logger.debug(
+                "doc item L%d: %s label=%s",
+                level,
+                type(item).__name__,
+                getattr(item, "label", None),
+            )
+
+    parts = [text] if text else []
+    captioned = set()
+
+    for item, _level in doc.iterate_items(traverse_pictures=True):
+        if not isinstance(item, PictureItem) or item.self_ref in captioned:
+            continue
+        captioned.add(item.self_ref)
+
+        description = None
+        if item.meta and item.meta.description and item.meta.description.text:
+            description = item.meta.description.text.strip()
+        elif captioner and (not text or not _picture_has_content_children(item)):
+            try:
+                pil_image = item.get_image(doc=doc)
+                if pil_image:
+                    description = captioner.caption(pil_image)
+            except Exception as e:
+                logger.warning("Failed to caption image: %s", e)
+
+        if description:
+            parts.append(f"[Image: {description}]")
+
+    return "\n\n".join(parts)
 
 
 def _text_hash(text, doc_id, chunk_index):
@@ -511,7 +519,7 @@ def run_pipeline(args):
                     if isinstance(doc, str):
                         if doc.strip():
                             docs.append(doc)
-                    elif doc.export_to_markdown().strip():
+                    elif _docling_doc_has_content(doc):
                         docs.append(doc)
             except Exception as e:
                 perror(f"  Error converting {fpath.name}: {e}")
@@ -519,9 +527,14 @@ def run_pipeline(args):
     if not docs:
         raise ValueError("No documents were successfully converted")
 
-    # Set up image captioner if a caption URL is provided
+    # Set up image captioner: explicit URL, or reuse the VLM server for image-only docs
     caption_url = getattr(args, "caption_url", None)
-    captioner = ImageCaptioner(api_url=caption_url) if caption_url else None
+    if caption_url:
+        captioner = ImageCaptioner(api_url=caption_url)
+    elif needs_vlm and args.api_url:
+        captioner = ImageCaptioner(api_url=args.api_url)
+    else:
+        captioner = None
 
     # Chunk
     perror("Chunking and captioning documents..." if captioner else "Chunking documents...")
