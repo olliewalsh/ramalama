@@ -9,7 +9,7 @@ from typing import Optional, TypedDict
 
 import ramalama.annotations as oci_annotations
 from ramalama.arg_types import EngineArgType
-from ramalama.common import SemVer, engine_version, run_cmd
+from ramalama.common import SemVer, engine_cmd, engine_version, run_cmd
 from ramalama.logger import logger
 
 ocilabeltype = "org.containers.type"
@@ -56,7 +56,7 @@ def list_artifacts(args: EngineArgType):
         return []
 
     conman_args = [
-        args.engine,
+        *engine_cmd(args.engine),
         "artifact",
         "ls",
         "--format",
@@ -84,7 +84,7 @@ def list_artifacts(args: EngineArgType):
     models = []
     for artifact in artifacts:
         conman_args = [
-            args.engine,
+            *engine_cmd(args.engine),
             "artifact",
             "inspect",
             artifact["ID"],
@@ -136,7 +136,7 @@ def list_manifests(args: EngineArgType) -> list[ListModelResponse]:
         return []
 
     conman_args = [
-        args.engine,
+        *engine_cmd(args.engine),
         "images",
         "--filter",
         "manifest=true",
@@ -164,7 +164,7 @@ def list_manifests(args: EngineArgType) -> list[ListModelResponse]:
     models: list[ListModelResponse] = []
     for manifest in manifests:
         conman_args = [
-            args.engine,
+            *engine_cmd(args.engine),
             "manifest",
             "inspect",
             manifest["ID"],
@@ -206,7 +206,7 @@ def list_images(args: EngineArgType) -> list[ListModelResponse]:
         formatLine += ',"id":"{{ .ID }}"},'
 
     conman_args = [
-        conman,
+        *engine_cmd(conman),
         "images",
         "--filter",
         f"label={ocilabeltype}",
@@ -224,7 +224,7 @@ def list_images(args: EngineArgType) -> list[ListModelResponse]:
 
     if conman == 'docker':
         ids = [m["id"] for m in raw]
-        inspect_args = [conman, "image", "inspect", *ids, "--format", "{{.Id}} {{.Size}}"]
+        inspect_args = [*engine_cmd(conman), "image", "inspect", *ids, "--format", "{{.Id}} {{.Size}}"]
         inspect_out = run_cmd(inspect_args).stdout.decode("utf-8").strip()
 
         size_by_id: dict[str, str] = {}
