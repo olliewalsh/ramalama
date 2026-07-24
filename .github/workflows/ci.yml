@@ -636,7 +636,7 @@ jobs:
       - name: Start HF mirror
         if: steps.hf.outputs.has_token != 'true'
         run: |
-          podman run -d --name hfmirror -p 5000:5000 quay.io/ramalama/hfmirror:latest
+          podman run -d --name hfmirror --network=host quay.io/ramalama/hfmirror:latest
           timeout 120 bash -c 'until curl -sf http://127.0.0.1:5000/v2/ >/dev/null 2>&1; do sleep 2; done'
 
       - name: Create toolbox
@@ -654,6 +654,7 @@ jobs:
           toolbox run -c ramalama-test bash -c 'test -f /run/.toolboxenv && echo "Toolbox detected" || { echo "NOT in toolbox"; exit 1; }'
           toolbox run -c ramalama-test bash -c 'which flatpak-spawn && echo "flatpak-spawn available" || { echo "flatpak-spawn NOT available"; exit 1; }'
           toolbox run -c ramalama-test flatpak-spawn --host podman version
+          toolbox run -c ramalama-test bash -c 'curl -sf http://127.0.0.1:5000/v2/ >/dev/null && echo "HF mirror reachable from toolbox" || echo "WARNING: HF mirror NOT reachable from toolbox"'
 
       - name: Run e2e tests in toolbox
         env:
