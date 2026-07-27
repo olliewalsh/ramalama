@@ -654,12 +654,30 @@ jobs:
           toolbox run -c ramalama-test bash -c 'test -f /run/.toolboxenv && echo "Toolbox detected" || { echo "NOT in toolbox"; exit 1; }'
           toolbox run -c ramalama-test bash -c 'which flatpak-spawn && echo "flatpak-spawn available" || { echo "flatpak-spawn NOT available"; exit 1; }'
           toolbox run -c ramalama-test flatpak-spawn --host podman version
-          toolbox run -c ramalama-test bash -c 'curl -sf http://127.0.0.1:5000/v2/ >/dev/null && echo "HF mirror reachable from toolbox" || echo "WARNING: HF mirror NOT reachable from toolbox"'
+
+      - name: Resolve HF mirror endpoint for toolbox
+        if: steps.hf.outputs.has_token != 'true'
+        run: |
+          # The toolbox container may have its own network namespace, so
+          # 127.0.0.1 won't reach the host. Probe for the right address.
+          if toolbox run -c ramalama-test curl -sf http://127.0.0.1:5000/v2/ >/dev/null 2>&1; then
+            echo "TOOLBOX_HF_ENDPOINT=http://127.0.0.1:5000" >> "$GITHUB_ENV"
+          else
+            HOST_IP=$(toolbox run -c ramalama-test bash -c \
+              'getent hosts host.containers.internal 2>/dev/null | awk "{print \$1}"' || true)
+            if [ -z "$HOST_IP" ]; then
+              HOST_IP=$(toolbox run -c ramalama-test bash -c \
+                'ip route | grep default | awk "{print \$3}"')
+            fi
+            echo "Toolbox cannot reach 127.0.0.1:5000, using host IP $HOST_IP"
+            toolbox run -c ramalama-test curl -sf "http://${HOST_IP}:5000/v2/" >/dev/null
+            echo "TOOLBOX_HF_ENDPOINT=http://${HOST_IP}:5000" >> "$GITHUB_ENV"
+          fi
 
       - name: Run e2e tests in toolbox
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
+          HF_ENDPOINT: ${{ env.TOOLBOX_HF_ENDPOINT }}
         run: |
           toolbox run -c ramalama-test bash -c "cd $GITHUB_WORKSPACE && HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make e2e-tests"
 
