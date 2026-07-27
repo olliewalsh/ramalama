@@ -14,6 +14,7 @@ import pytest
 import requests
 import urllib3
 
+from ramalama.common import engine_cmd
 from test.conftest import ramalama_container_engine
 
 if sys.byteorder == "big":
@@ -73,7 +74,7 @@ def container_registry():
         # fmt: off
         subprocess.run(
             [
-                ramalama_container_engine, "run", "-d", "--rm",
+                *engine_cmd(ramalama_container_engine), "run", "-d", "--rm",
                 "--name", registry_name,
                 "--network=host",
                 "-v", f"{work_dir.as_posix()}:/auth:Z",
@@ -114,8 +115,8 @@ def container_registry():
             )
         finally:
             print(f"--- Registry logs ({registry_name}) ---", flush=True)
-            subprocess.run([ramalama_container_engine, "logs", registry_name], check=False)
-            subprocess.run([ramalama_container_engine, "stop", registry_name], check=False)
+            subprocess.run([*engine_cmd(ramalama_container_engine), "logs", registry_name], check=False)
+            subprocess.run([*engine_cmd(ramalama_container_engine), "stop", registry_name], check=False)
 
 
 @dataclass

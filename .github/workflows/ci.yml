@@ -653,14 +653,14 @@ jobs:
         run: |
           toolbox run -c ramalama-test bash -c 'test -f /run/.toolboxenv && echo "Toolbox detected" || { echo "NOT in toolbox"; exit 1; }'
           toolbox run -c ramalama-test bash -c 'which flatpak-spawn && echo "flatpak-spawn available" || { echo "flatpak-spawn NOT available"; exit 1; }'
-          toolbox run -c ramalama-test flatpak-spawn --host podman version
+          toolbox run -c ramalama-test dbus-run-session -- flatpak-spawn --host podman version
 
       - name: Run e2e tests in toolbox
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
         run: |
-          toolbox run -c ramalama-test bash -c "cd $GITHUB_WORKSPACE && HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make e2e-tests"
+          toolbox run -c ramalama-test dbus-run-session -- bash -c "cd $GITHUB_WORKSPACE && HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make e2e-tests"
 
 # FIXME: ci script should be able to run on MAC.
 #      - name: Run ci
