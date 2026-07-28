@@ -324,12 +324,26 @@ def load_env_config(env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
     return config
 
 
+def _default_tmpdir() -> str:
+    """Return the default temp directory.
+
+    In a toolbox, /var/tmp is not shared with the host, so container engine
+    commands dispatched via flatpak-spawn --host cannot access files there.
+    Use a directory under $HOME which is always shared.
+    """
+    if in_toolbox():
+        tmpdir = os.path.join(os.path.expanduser("~"), ".cache", "ramalama", "tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        return tmpdir
+    return DEFAULT_TMPDIR
+
+
 def ensure_tmpdir(config: Optional[Config] = None) -> None:
     """Set ``TMPDIR`` for tempfile-backed operations.
 
     When ``tempdir`` is set in ``ramalama.conf``, it overrides the host ``TMPDIR``.
     Otherwise the host value is kept. On non-Windows systems, if neither is set,
-    ``/var/tmp`` is used.
+    ``/var/tmp`` is used (or ``~/.cache/ramalama/tmp`` in a toolbox).
     """
     if sys.platform == "win32":
         return
@@ -340,7 +354,7 @@ def ensure_tmpdir(config: Optional[Config] = None) -> None:
             tempfile.tempdir = None
             return
     if not os.environ.get("TMPDIR", "").strip():
-        os.environ["TMPDIR"] = DEFAULT_TMPDIR
+        os.environ["TMPDIR"] = _default_tmpdir()
         tempfile.tempdir = None
 
 
