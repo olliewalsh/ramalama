@@ -610,9 +610,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check HF token
-        id: hf
-        run: echo "has_token=${{ secrets.HF_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - name: Start systemd user session
+        run: |
+          sudo loginctl enable-linger $(whoami)
+          sleep 2
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus" >> "$GITHUB_ENV"
 
       - name: install requirements
         shell: bash
@@ -633,6 +636,10 @@ jobs:
            sudo apt-get purge firefox
            sudo apt-get upgrade -y podman crun
 
+      - name: Check HF token
+        id: hf
+        run: echo "has_token=${{ secrets.HF_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Create toolbox
         run: |
           toolbox create --assumeyes --distro fedora --release 44 ramalama-test
@@ -649,24 +656,18 @@ jobs:
           podman run -d --name hfmirror --network=container:ramalama-test quay.io/ramalama/hfmirror:latest
           toolbox run -c ramalama-test bash -c 'timeout 120 bash -c "until curl -sf http://127.0.0.1:5000/v2/ >/dev/null 2>&1; do sleep 2; done"'
 
-      - name: Start D-Bus session for flatpak-spawn
-        run: |
-          mkdir -p "$HOME/.dbus"
-          dbus-daemon --session --address="unix:path=$HOME/.dbus/bus" --fork
-          echo "unix:path=$HOME/.dbus/bus" > "$HOME/.dbus/address"
-
       - name: Verify toolbox environment
         run: |
           toolbox run -c ramalama-test bash -c 'test -f /run/.toolboxenv && echo "Toolbox detected" || { echo "NOT in toolbox"; exit 1; }'
           toolbox run -c ramalama-test bash -c 'which flatpak-spawn && echo "flatpak-spawn available" || { echo "flatpak-spawn NOT available"; exit 1; }'
-          toolbox run -c ramalama-test bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat "$HOME/.dbus/address"); flatpak-spawn --host podman version'
+          toolbox run -c ramalama-test flatpak-spawn --host podman version
 
       - name: Run e2e tests in toolbox
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
         run: |
-          toolbox run -c ramalama-test bash -c "export DBUS_SESSION_BUS_ADDRESS=\$(cat \$HOME/.dbus/address); cd $GITHUB_WORKSPACE && HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make e2e-tests"
+          toolbox run -c ramalama-test bash -c "cd $GITHUB_WORKSPACE && HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make e2e-tests"
 
 # FIXME: ci script should be able to run on MAC.
 #      - name: Run ci
