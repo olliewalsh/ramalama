@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 WILDCARD_BIND_HOSTS = frozenset({"0.0.0.0", "::"})
+LOOPBACK_BIND_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
 def normalize_bind_host(host: Optional[str]) -> str:
@@ -45,6 +46,13 @@ def format_bind_host_literal(host: Optional[str]) -> str:
     return f"[{normalized}]" if ":" in normalized else normalized
 
 
+def is_loopback_bind_host(host: Optional[str]) -> bool:
+    """Return True if host refers to the loopback interface (local-only)."""
+    if not host:
+        return False
+    return normalize_bind_host(host) in LOOPBACK_BIND_HOSTS
+
+
 def format_bind_host_publish_prefix(host: Optional[str]) -> str:
     """Return host prefix for container publish-port arguments, or empty for IPv6 wildcard."""
     if not host:
@@ -52,4 +60,8 @@ def format_bind_host_publish_prefix(host: Optional[str]) -> str:
     normalized = normalize_bind_host(host)
     if normalized == "::":
         return ""
+    # podman/docker -p requires an IP literal, not a hostname; map the loopback
+    # name to its IPv4 address.
+    if normalized == "localhost":
+        normalized = "127.0.0.1"
     return f"[{normalized}]:" if ":" in normalized else f"{normalized}:"

@@ -7,6 +7,7 @@ from typing import Optional
 
 from ramalama.common import RAG_DIR, get_accel_env_vars, get_gpu_devices
 from ramalama.file import PlainFile
+from ramalama.host_utils import format_bind_host_publish_prefix, is_loopback_bind_host
 from ramalama.version import version
 
 
@@ -107,14 +108,32 @@ class Compose:
 
     def _gen_ports(self) -> str:
         port_arg = getattr(self.args, "port", None)
+        # Prefix the published port with the bind host (loopback by default) so
+        # the service is only exposed locally unless --host is set to a wildcard.
+        host_arg = getattr(self.args, "host", None)
+        host = format_bind_host_publish_prefix(host_arg)
+        note = self._loopback_publish_note(host_arg)
         if not port_arg:
             # Default to 8080 if no port is specified
-            return '    ports:\n      - "8080:8080"'
+            return f'{note}    ports:\n      - "{host}8080:8080"'
 
         p = port_arg.split(":", 2)
         host_port = p[1] if len(p) > 1 else p[0]
         container_port = p[0]
-        return f'    ports:\n      - "{host_port}:{container_port}"'
+        return f'{note}    ports:\n      - "{host}{host_port}:{container_port}"'
+
+    @staticmethod
+    def _loopback_publish_note(host: Optional[str]) -> str:
+        # On VM-backed engines a loopback publish is bound inside the VM and is
+        # not reachable from the host; flag it so the reader can widen the bind.
+        if not is_loopback_bind_host(host):
+            return ""
+        return (
+            "    # NOTE: on VM-backed engines (podman machine / Docker Desktop on\n"
+            "    # macOS and Windows), this loopback publish is bound inside the VM\n"
+            "    # and is not reachable from the host. Set --host 0.0.0.0 (or edit\n"
+            "    # the published port below) if you need to reach it there.\n"
+        )
 
     def _gen_environment(self) -> str:
         env_vars = get_accel_env_vars()

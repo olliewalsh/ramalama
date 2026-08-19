@@ -107,6 +107,20 @@ def test_sandbox_dryrun_url(agent):
 @pytest.mark.e2e
 @skip_if_no_container
 @pytest.mark.parametrize("agent", ["goose", "opencode", "pi"])
+def test_sandbox_dryrun_localhost_url_uses_host_network(agent):
+    """A localhost --url should share the host netns and keep the localhost URL."""
+    result = check_output(_dryrun_cmd(agent) + ["--url", "http://localhost:8321"])
+    # Share the host network namespace so the agent reaches a loopback-only server.
+    assert re.search(r"--network host\b", result)
+    # The URL is used as-is; no host.containers.internal / host.docker.internal rewrite.
+    assert "http://localhost:8321" in result
+    assert "host.containers.internal" not in result
+    assert "host.docker.internal" not in result
+
+
+@pytest.mark.e2e
+@skip_if_no_container
+@pytest.mark.parametrize("agent", ["goose", "opencode", "pi"])
 def test_sandbox_dryrun_port(agent):
     """--port should overwrite the default port for the localhost endpoint."""
     result = check_output(_dryrun_cmd(agent) + ["--port", "8321"])
