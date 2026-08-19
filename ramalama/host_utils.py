@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 from typing import Optional
 
 WILDCARD_BIND_HOSTS = frozenset({"0.0.0.0", "::"})
@@ -65,3 +66,19 @@ def format_bind_host_publish_prefix(host: Optional[str]) -> str:
     if normalized == "localhost":
         normalized = "127.0.0.1"
     return f"[{normalized}]:" if ":" in normalized else f"{normalized}:"
+
+
+def format_vm_aware_publish_prefix(host: Optional[str]) -> str:
+    """Return a publish-port host prefix, accounting for VM-backed engines.
+
+    On VM-backed engines (podman machine / Docker Desktop on macOS and Windows,
+    including WSL2), published ports are reached through a proxy (e.g. gvproxy)
+    that forwards the host's loopback into the VM. Binding the port to the VM's
+    loopback would make it unreachable from the host, so publish on all
+    interfaces inside the VM; the proxy still only exposes the port on the host's
+    loopback, so this does not widen access. On native engines this is identical
+    to format_bind_host_publish_prefix.
+    """
+    if is_loopback_bind_host(host) and platform.system() in ("Darwin", "Windows"):
+        return ""
+    return format_bind_host_publish_prefix(host)

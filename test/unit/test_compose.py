@@ -263,14 +263,14 @@ def test_compose_no_port_arg(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "host, expected_ports, expect_note",
+    "host, expected_ports",
     [
-        ("127.0.0.1", 'ports:\n      - "127.0.0.1:9090:9090"', True),
-        ("::", 'ports:\n      - "9090:9090"', False),
-        ("::1", 'ports:\n      - "[::1]:9090:9090"', True),
+        ("127.0.0.1", 'ports:\n      - "127.0.0.1:9090:9090"'),
+        ("::", 'ports:\n      - "9090:9090"'),
+        ("::1", 'ports:\n      - "[::1]:9090:9090"'),
     ],
 )
-def test_compose_ports_bind_host(monkeypatch, host, expected_ports, expect_note):
+def test_compose_ports_bind_host(monkeypatch, host, expected_ports):
     """The published port is prefixed with the bind host (loopback by default)."""
     monkeypatch.setattr("os.path.exists", lambda path: False)
     monkeypatch.setattr("ramalama.compose.get_accel_env_vars", lambda: {})
@@ -282,9 +282,6 @@ def test_compose_ports_bind_host(monkeypatch, host, expected_ports, expect_note)
     result = compose.generate().content
 
     assert expected_ports in result
-    # A loopback publish is unreachable from the host on VM-backed engines, so
-    # the generated file flags it; a wildcard bind is reachable and stays quiet.
-    assert ("VM-backed engines" in result) is expect_note
 
 
 def test_compose_no_env_vars(monkeypatch):

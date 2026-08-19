@@ -15,13 +15,12 @@ from typing import Any, Optional
 # Live reference for checking global vars
 import ramalama.common
 from ramalama.arg_types import BaseEngineArgsType
-from ramalama.common import check_nvidia, engine_cmd, exec_cmd, get_accel_env_vars, host_path, perror, run_cmd
+from ramalama.common import check_nvidia, engine_cmd, exec_cmd, genname, get_accel_env_vars, host_path, perror, run_cmd
 from ramalama.compat import NamedTemporaryFile
 from ramalama.config import ActiveConfig
 from ramalama.host_utils import (
     format_bind_host_for_connection,
-    format_bind_host_publish_prefix,
-    is_loopback_bind_host,
+    format_vm_aware_publish_prefix,
 )
 from ramalama.logger import logger
 from ramalama.path_utils import normalize_host_path_for_container
@@ -227,15 +226,7 @@ class Engine(BaseEngine):
             self.add_args("-p", f"{host}{port_str}:{port_str}")
 
     def _publish_host_prefix(self, host: Optional[str]) -> str:
-        # On VM-backed engines (podman machine / Docker Desktop on macOS and
-        # Windows, including WSL2), published ports are reached through a proxy
-        # (e.g. gvproxy) that forwards the host's loopback into the VM. Binding
-        # the port to the VM's loopback would make it unreachable from the host,
-        # so publish on all interfaces inside the VM. The proxy still only
-        # exposes the port on the host's loopback, so this does not widen access.
-        if is_loopback_bind_host(host) and platform.system() in ("Darwin", "Windows"):
-            return ""
-        return format_bind_host_publish_prefix(host)
+        return format_vm_aware_publish_prefix(host)
 
     def add_privileged_options(self) -> None:
         if getattr(self.args, "privileged", False):
@@ -486,6 +477,50 @@ def stop_container(args, name: str, remove: bool = False):
                 return
             else:
                 raise
+
+
+def create_network(args) -> str:
+    """Create a private, user-defined container network and return its name.
+
+    Helper containers and their consumer join this network so they can reach
+    each other by container name (podman/docker provide name-based DNS on
+    user-defined networks), with nothing published to the network. On a dry
+    run the network is not created, but a name is still returned so the
+    generated command reflects it.
+    """
+    conman = str(args.engine) if args.engine is not None else None
+    if conman == "" or conman is None:
+        raise ValueError("no container manager (Podman, Docker) found")
+
+    name = genname("ramalama-net-")
+    if not getattr(args, "dryrun", False):
+        run_cmd([conman, "network", "create", name])
+    return name
+
+
+def remove_network(args, name: str) -> None:
+    """Remove a network created by create_network. Best effort; errors ignored.
+
+    On a dry run nothing was created, so nothing is removed.
+    """
+    if not name:
+        return
+    conman = str(args.engine) if args.engine is not None else None
+    if conman == "" or conman is None:
+        return
+    if getattr(args, "dryrun", False):
+        return
+
+    # `podman network rm -f` disconnects any lingering containers; docker has no
+    # such flag but the attached containers are removed before this is called.
+    conman_args = [conman, "network", "rm"]
+    if conman == "podman":
+        conman_args += ["-f"]
+    conman_args += [name]
+    try:
+        run_cmd(conman_args, ignore_all=True)
+    except Exception as e:  # Cleanup is best effort.
+        logger.debug(f"Failed to remove network {name}: {e}")
 
 
 def add_labels(args, add_label: Callable[[str], None]):

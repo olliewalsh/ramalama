@@ -38,7 +38,7 @@ from ramalama.config import (
 )
 from ramalama.config_types import COLOR_OPTIONS
 from ramalama.endian import EndianMismatchError
-from ramalama.host_utils import format_bind_host_for_url, format_bind_host_publish_prefix
+from ramalama.host_utils import format_bind_host_for_url, format_vm_aware_publish_prefix
 from ramalama.log_levels import LogLevel
 from ramalama.logger import configure_logger, logger
 from ramalama.model_inspect.error import ParseError
@@ -1090,10 +1090,9 @@ def _rag_args(args):
     rag_args = copy.copy(args)
     rag_args.MODEL = args.rag
     rag_args.image = args.rag_image
-    if args.engine == "podman":
-        rag_args.model_host = "host.containers.internal"
-    else:
-        rag_args.model_host = f"host.{args.engine}.internal"
+    # model_host is set later by _setup_rag_network to the model server's container
+    # name once the shared private network is created.
+    rag_args.model_host = None
     # If --name was specified, use it for the RAG proxy
     args.name = None
     # If --port was specified, use it for the RAG proxy, and
@@ -1214,8 +1213,10 @@ def daemon_start_cli(args):
 
         # Honor the requested bind host (loopback by default) on the host-side
         # port publish; the daemon inside the container binds the wildcard below
-        # so the published port can still reach it.
-        publish_prefix = format_bind_host_publish_prefix(args.host)
+        # so the published port can still reach it. On VM-backed engines a
+        # loopback publish is bound inside the VM and unreachable from the host,
+        # so format_vm_aware_publish_prefix drops the prefix there (matching serve).
+        publish_prefix = format_vm_aware_publish_prefix(args.host)
         daemon_cmd += [
             *engine_cmd(args.engine),
             "run",

@@ -307,7 +307,10 @@ def _capture_daemon_cmd(args) -> list:
         ("0.0.0.0", "0.0.0.0:1234:8080"),
     ],
 )
-def test_daemon_start_container_publish_respects_host(host, expected_publish):
+def test_daemon_start_container_publish_respects_host(monkeypatch, host, expected_publish):
+    # Pin a native engine so the host-side publish prefix is platform-independent;
+    # the VM-backed loopback-drop behavior is covered separately below.
+    monkeypatch.setattr("ramalama.host_utils.platform.system", lambda: "Linux")
     cmd = _capture_daemon_cmd(_daemon_start_args(host=host))
     # -p <publish> pair
     assert "-p" in cmd
@@ -324,3 +327,12 @@ def test_daemon_start_nocontainer_honors_host():
     # No container run wrapper, no port publish; daemon binds the requested host.
     assert "-p" not in cmd
     assert cmd[cmd.index("--host") + 1] == "127.0.0.1"
+
+
+def test_daemon_start_container_publish_vm_backed_drops_loopback(monkeypatch):
+    # On VM-backed engines (macOS/Windows) a loopback publish is bound inside the
+    # VM and unreachable from the host, so the daemon path must drop the prefix
+    # just like serve does, publishing on all interfaces inside the VM.
+    monkeypatch.setattr("ramalama.host_utils.platform.system", lambda: "Darwin")
+    cmd = _capture_daemon_cmd(_daemon_start_args(host="127.0.0.1"))
+    assert cmd[cmd.index("-p") + 1] == "1234:8080"
