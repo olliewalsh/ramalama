@@ -133,6 +133,15 @@ class _TruncatingHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(self.BODY)))
             self.end_headers()
             self.wfile.write(self.BODY)
+        elif self.path == "/badrange":
+            # Answers 206, but starts the body somewhere other than where the client asked.
+            start = 500
+            remaining = self.BODY[start:]
+            self.send_response(206)
+            self.send_header("Content-Length", str(len(remaining)))
+            self.send_header("Content-Range", f"bytes {start}-{len(self.BODY) - 1}/{len(self.BODY)}")
+            self.end_headers()
+            self.wfile.write(remaining)
         elif self.path == "/resumable":
             # Truncate the first attempt, then honour the Range header the client sends
             # on the retry so the download can resume instead of restarting.
@@ -237,6 +246,25 @@ class TestTruncatedDownload:
         # A 200 reply carries the whole body from byte 0. Appending it to the stale partial
         # would leave a file 100 bytes too long, and the size check would not catch it.
         assert dest.read_bytes() == _TruncatingHandler.BODY
+        assert not partial.exists()
+
+    def test_mismatched_range_start_is_rejected(self, truncating_server, tmp_path):
+        dest = tmp_path / "model.gguf"
+        partial = tmp_path / "model.gguf.partial"
+        partial.write_bytes(b"\x00" * 100)  # left behind by an earlier, interrupted attempt
+
+        # The 206 body starts at byte 500, not at the 100 bytes already on disk, so it can
+        # neither be appended nor written from byte 0.
+        with pytest.raises(IOError, match="unusable"):
+            HttpClient().init(
+                url=f"{truncating_server}/badrange",
+                headers={},
+                output_file=str(dest),
+                show_progress=False,
+            )
+
+        assert not dest.exists()
+        # The stale partial is gone, so the retry asks for the whole file again.
         assert not partial.exists()
 
     def test_download_file_resumes_after_truncation(self, truncating_server, tmp_path):

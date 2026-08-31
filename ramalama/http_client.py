@@ -77,7 +77,7 @@ class HttpClient:
         if self.response.status not in (200, 206):
             raise IOError(f"Request failed: {self.response.status}")
 
-    def resume_offset(self):
+    def resume_offset(self) -> Optional[int]:
         # "Content-Range: bytes 100-999/1000" -> 100
         content_range = self.response.getheader('content-range') or ""
         unit, _, span = content_range.partition(" ")
@@ -90,9 +90,8 @@ class HttpClient:
             return None
 
     def verify_resume_point(self, output_file_partial: Optional[str]) -> None:
-        # A server is free to ignore the Range header and answer 200 with the whole body.
-        # Appending that to a non-empty .partial would silently produce a file that is too
-        # long, so throw away what we have and start over from byte 0.
+        # A server is free to ignore the Range header. Appending a body that does not start
+        # where the .partial ends would silently produce a wrong file, so drop what we have.
         if not self.file_size:
             return
 
@@ -104,6 +103,12 @@ class HttpClient:
             os.remove(output_file_partial)
 
         self.file_size = 0
+
+        if self.response.status != 200:
+            # Only a 200 carries the whole file from byte 0. A 206 that starts at some other
+            # offset holds a slice we can neither append nor write from zero, so discard it
+            # and let the retry loop open a fresh request.
+            raise IOError(f"Server answered the range request with an unusable {self.response.status} response")
 
     def perform_download(self, file, show_progress):
         self.total_to_download += self.file_size
