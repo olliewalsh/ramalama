@@ -127,6 +127,12 @@ class _TruncatingHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(self.BODY)
+        elif self.path == "/ignoresrange":
+            # Answers 200 with the whole body even though the client asked for a range.
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(self.BODY)))
+            self.end_headers()
+            self.wfile.write(self.BODY)
         elif self.path == "/resumable":
             # Truncate the first attempt, then honour the Range header the client sends
             # on the retry so the download can resume instead of restarting.
@@ -215,6 +221,23 @@ class TestTruncatedDownload:
         )
 
         assert dest.read_bytes() == _TruncatingHandler.BODY
+
+    def test_range_ignored_by_server_restarts_instead_of_appending(self, truncating_server, tmp_path):
+        dest = tmp_path / "model.gguf"
+        partial = tmp_path / "model.gguf.partial"
+        partial.write_bytes(b"\x00" * 100)  # left behind by an earlier, interrupted attempt
+
+        HttpClient().init(
+            url=f"{truncating_server}/ignoresrange",
+            headers={},
+            output_file=str(dest),
+            show_progress=False,
+        )
+
+        # A 200 reply carries the whole body from byte 0. Appending it to the stale partial
+        # would leave a file 100 bytes too long, and the size check would not catch it.
+        assert dest.read_bytes() == _TruncatingHandler.BODY
+        assert not partial.exists()
 
     def test_download_file_resumes_after_truncation(self, truncating_server, tmp_path):
         dest = tmp_path / "model.gguf"

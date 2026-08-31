@@ -37,6 +37,7 @@ class HttpClient:
 
         self.file_size = self.set_resume_point(output_file_partial)
         self.urlopen(url, headers)
+        self.verify_resume_point(output_file_partial)
         content_length = self.response.getheader('content-length')
         self.has_content_length = content_length is not None
         self.total_to_download = int(content_length or 0)
@@ -76,6 +77,34 @@ class HttpClient:
         if self.response.status not in (200, 206):
             raise IOError(f"Request failed: {self.response.status}")
 
+    def resume_offset(self):
+        # "Content-Range: bytes 100-999/1000" -> 100
+        content_range = self.response.getheader('content-range') or ""
+        unit, _, span = content_range.partition(" ")
+        if unit.lower() != "bytes":
+            return None
+
+        try:
+            return int(span.split("-", 1)[0])
+        except ValueError:
+            return None
+
+    def verify_resume_point(self, output_file_partial: Optional[str]) -> None:
+        # A server is free to ignore the Range header and answer 200 with the whole body.
+        # Appending that to a non-empty .partial would silently produce a file that is too
+        # long, so throw away what we have and start over from byte 0.
+        if not self.file_size:
+            return
+
+        if self.response.status == 206 and self.resume_offset() == self.file_size:
+            return
+
+        logger.debug(f"Server did not honour the range request, restarting download of {output_file_partial}")
+        if output_file_partial and os.path.exists(output_file_partial):
+            os.remove(output_file_partial)
+
+        self.file_size = 0
+
     def perform_download(self, file, show_progress):
         self.total_to_download += self.file_size
         self.now_downloaded = 0
@@ -104,7 +133,7 @@ class HttpClient:
                 # Output a newline after the progress bar
                 perror("")
 
-    def verify_download_size(self, output_file_partial):
+    def verify_download_size(self, output_file_partial: Optional[str]) -> None:
         # CPython's HTTPResponse.read(amt) returns b"" rather than raising when a
         # Content-Length body is cut short, so a dropped connection is indistinguishable
         # from a clean EOF. Check what actually landed on disk before promoting it.
