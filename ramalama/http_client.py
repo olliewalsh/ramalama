@@ -22,6 +22,10 @@ HTTP_NOT_FOUND = 404
 HTTP_RANGE_NOT_SATISFIABLE = 416  # "Range Not Satisfiable" error (file already downloaded)
 
 
+class TruncatedDownloadError(IOError):
+    """Response body ended before the declared Content-Length was reached."""
+
+
 class HttpClient:
     def __init__(self):
         pass
@@ -33,7 +37,9 @@ class HttpClient:
 
         self.file_size = self.set_resume_point(output_file_partial)
         self.urlopen(url, headers)
-        self.total_to_download = int(self.response.getheader('content-length', 0))
+        content_length = self.response.getheader('content-length')
+        self.has_content_length = content_length is not None
+        self.total_to_download = int(content_length or 0)
         if response_bytes is not None:
             response_bytes.append(self.response.read())
         else:
@@ -50,6 +56,8 @@ class HttpClient:
                 self.perform_download(out.file, show_progress)
             finally:
                 del out  # Ensure file is closed before rename
+
+            self.verify_download_size(output_file_partial)
 
         if output_file:
             if output_file_partial is None:
@@ -95,6 +103,19 @@ class HttpClient:
             if show_progress:
                 # Output a newline after the progress bar
                 perror("")
+
+    def verify_download_size(self, output_file_partial):
+        # CPython's HTTPResponse.read(amt) returns b"" rather than raising when a
+        # Content-Length body is cut short, so a dropped connection is indistinguishable
+        # from a clean EOF. Check what actually landed on disk before promoting it.
+        if not self.has_content_length or not output_file_partial:
+            return
+
+        downloaded = os.path.getsize(output_file_partial)
+        if downloaded < self.total_to_download:
+            raise TruncatedDownloadError(
+                f"Incomplete download: got {downloaded} of {self.total_to_download} bytes from the server"
+            )
 
     def human_readable_time(self, seconds):
         hrs = int(seconds) // 3600
