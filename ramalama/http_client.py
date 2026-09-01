@@ -92,10 +92,14 @@ class HttpClient:
     def verify_resume_point(self, output_file_partial: Optional[str]) -> None:
         # A server is free to ignore the Range header. Appending a body that does not start
         # where the .partial ends would silently produce a wrong file, so drop what we have.
-        if not self.file_size:
-            return
-
-        if self.response.status == 206 and self.resume_offset() == self.file_size:
+        # A 206 has to prove where it starts even when nothing has been downloaded yet:
+        # asking from byte 0 is still a range request, and a slice from anywhere else is
+        # just as wrong at the start of a download as it is halfway through one.
+        if self.response.status == 206:
+            if self.resume_offset() == self.file_size:
+                return
+        elif not self.file_size:
+            # A 200 carries the whole file from byte 0, which is what we asked for.
             return
 
         logger.debug(f"Server did not honour the range request, restarting download of {output_file_partial}")

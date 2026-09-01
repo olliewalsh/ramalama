@@ -2,6 +2,7 @@ import logging
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -266,6 +267,36 @@ class TestTruncatedDownload:
         assert not dest.exists()
         # The stale partial is gone, so the retry asks for the whole file again.
         assert not partial.exists()
+
+    def test_mismatched_range_start_is_rejected_from_byte_zero(self, truncating_server, tmp_path):
+        dest = tmp_path / "model.gguf"
+
+        # Nothing has been downloaded yet, so the client asks for "bytes=0-". The 206 body
+        # still starts at byte 500, and writing it from byte 0 would leave a file that is
+        # the right length but the wrong content, which the size check cannot catch.
+        with pytest.raises(IOError, match="unusable"):
+            HttpClient().init(
+                url=f"{truncating_server}/badrange",
+                headers={},
+                output_file=str(dest),
+                show_progress=False,
+            )
+
+        assert not dest.exists()
+        assert not (tmp_path / "model.gguf.partial").exists()
+
+    def test_download_file_rejects_a_persistently_bad_range(self, truncating_server, tmp_path):
+        dest = tmp_path / "model.gguf"
+        config = SimpleNamespace(http_client=SimpleNamespace(max_retries=2, max_retry_delay=0))
+
+        # /badrange answers every attempt the same way, so the retry loop has to give up
+        # rather than promote the mismatched body to the real path.
+        with patch("ramalama.http_client.ActiveConfig", return_value=config):
+            with pytest.raises(ConnectionError):
+                download_file(url=f"{truncating_server}/badrange", dest_path=str(dest), show_progress=False)
+
+        assert not dest.exists()
+        assert not (tmp_path / "model.gguf.partial").exists()
 
     def test_download_file_resumes_after_truncation(self, truncating_server, tmp_path):
         dest = tmp_path / "model.gguf"
