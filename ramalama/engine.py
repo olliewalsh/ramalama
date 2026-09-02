@@ -15,7 +15,7 @@ from typing import Any, Optional
 # Live reference for checking global vars
 import ramalama.common
 from ramalama.arg_types import BaseEngineArgsType
-from ramalama.common import check_nvidia, engine_cmd, exec_cmd, get_accel_env_vars, perror, run_cmd
+from ramalama.common import check_nvidia, engine_cmd, exec_cmd, get_accel_env_vars, host_path, perror, run_cmd
 from ramalama.compat import NamedTemporaryFile
 from ramalama.config import ActiveConfig
 from ramalama.host_utils import format_bind_host_for_connection, format_bind_host_publish_prefix
@@ -84,7 +84,7 @@ class BaseEngine(ABC):
         if check_nvidia() == "cuda":
             if self.use_docker:
                 self.exec_args += ["--runtime", "nvidia"]
-            elif os.access("/usr/bin/nvidia-container-runtime", os.X_OK):
+            elif os.access(host_path("/usr/bin/nvidia-container-runtime"), os.X_OK):
                 self.exec_args += ["--runtime", "/usr/bin/nvidia-container-runtime"]
 
     def add_privileged_options(self):

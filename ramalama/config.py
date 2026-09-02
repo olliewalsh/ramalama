@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal, Mapping, Optional
 
 from ramalama.cli_arg_normalization import normalize_pull_arg
-from ramalama.common import apple_vm, available, in_toolbox, version_tagged_image
+from ramalama.common import apple_vm, available, host_available, in_toolbox, version_tagged_image
 from ramalama.config_types import SUPPORTED_ENGINES, SUPPORTED_RUNTIMES
 from ramalama.layered_config import LayeredMixin
 from ramalama.log_levels import LogLevel, coerce_log_level
@@ -68,24 +68,13 @@ def get_default_host() -> str:
         return "0.0.0.0"
 
 
-def _host_engine_available(engine: str) -> bool:
-    """Check if a container engine is available on the host via flatpak-spawn."""
-    import subprocess
-
-    try:
-        subprocess.run(["flatpak-spawn", "--host", "which", engine], check=True, capture_output=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-
 def get_default_engine() -> Optional[SUPPORTED_ENGINES]:
     """Determine the container manager to use based on environment and platform."""
     if in_toolbox():
         if available("flatpak-spawn"):
-            if _host_engine_available("podman"):
+            if host_available("podman"):
                 return "podman"
-            if _host_engine_available("docker"):
+            if host_available("docker"):
                 return "docker"
         return None
 

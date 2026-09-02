@@ -31,7 +31,7 @@ RamaLama CLI defaults can be modified via `ramalama.conf` files. Default setting
 
 On Fedora Silverblue and other immutable variants the system is read-only. You can run RamaLama in either of these ways:
 
-- **Toolbox** (recommended): Create a Toolbox container and install RamaLama inside it (e.g. `pip install ramalama` or `dnf install ramalama`). When `flatpak-spawn` is available (included in Fedora Toolbox by default), RamaLama automatically detects the toolbox environment and uses `flatpak-spawn --host` to run container engine commands (Podman/Docker) on the host. No manual socket bind-mounting or engine configuration is needed. The `Toolbox` field in `ramalama info` output indicates whether toolbox mode is active.
+- **Toolbox** (recommended): Create a Toolbox container and install RamaLama inside it (e.g. `pip install ramalama` or `dnf install ramalama`). When `flatpak-spawn` is available (included in Fedora Toolbox by default), RamaLama automatically detects the toolbox environment and uses `flatpak-spawn --host` to run container engine commands (Podman/Docker) on the host. GPU/accelerator detection tooling (such as `nvidia-smi`, `nvidia-ctk`, `npu-smi` and `mthreads-gmi`) is also run on the host, and host CDI configuration (e.g. `/etc/cdi`) is read via the toolbox's `/run/host` mount, so GPU acceleration is detected and used transparently even when the driver tooling is only installed on the host. No manual socket bind-mounting or engine configuration is needed. The `Toolbox` field in `ramalama info` output indicates whether toolbox mode is active.
 
 - **Host Installation**: Install RamaLama on the host via `rpm-ostree install ramalama` if the package is available for your image.
 

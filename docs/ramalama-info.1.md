@@ -42,7 +42,7 @@ The `Shortnames` field shows the used list of configuration files specifying AI 
 
 The `Store` field indicates the directory path where RamaLama stores its persistent data, including downloaded models, configuration files, and cached data. By default, this is located in the user's local share directory.
 
-The `Toolbox` field indicates whether RamaLama is running inside a Fedora Toolbox (or similar) environment. When `true` and `flatpak-spawn` is available, container engine commands are automatically proxied to the host via `flatpak-spawn --host`.
+The `Toolbox` field indicates whether RamaLama is running inside a Fedora Toolbox (or similar) environment. When `true` and `flatpak-spawn` is available, container engine commands and GPU/accelerator detection tooling are automatically proxied to the host via `flatpak-spawn --host`, and host CDI configuration is read via the `/run/host` mount.
 
 The `UseContainer` field indicates whether RamaLama will use containers or run the AI Models natively.
 

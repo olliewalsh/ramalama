@@ -122,10 +122,44 @@ def in_toolbox() -> bool:
     return os.path.exists("/run/.toolboxenv")
 
 
-def engine_cmd(engine: str) -> list[str]:
+def host_cmd(cmd: Sequence[str]) -> list[str]:
+    """Wrap a command so it runs on the host when inside a toolbox.
+
+    Inside a Fedora Toolbox (or similar) environment, host tooling such as the
+    container engine, ``nvidia-smi`` or ``nvidia-ctk`` is usually not installed
+    in the container. When ``flatpak-spawn`` is available, proxy the command to
+    the host via ``flatpak-spawn --host``; otherwise run it unchanged.
+    """
     if in_toolbox() and available("flatpak-spawn"):
-        return ["flatpak-spawn", "--host", engine]
-    return [engine]
+        return ["flatpak-spawn", "--host", *cmd]
+    return list(cmd)
+
+
+def engine_cmd(engine: str) -> list[str]:
+    return host_cmd([engine])
+
+
+def host_available(cmd: str) -> bool:
+    """Check whether ``cmd`` is available, on the host when inside a toolbox."""
+    if in_toolbox() and available("flatpak-spawn"):
+        try:
+            run_cmd(["flatpak-spawn", "--host", "which", cmd], ignore_all=True)
+            return True
+        except Exception:
+            return False
+    return available(cmd)
+
+
+def host_path(path: str) -> str:
+    """Map a host absolute path into the toolbox view.
+
+    Toolbox exposes the host root filesystem under ``/run/host``. Configuration
+    that lives on the host (e.g. CDI specs in ``/etc/cdi``) is not visible at its
+    normal location from inside the container, but is reachable via ``/run/host``.
+    """
+    if in_toolbox() and path.startswith("/") and os.path.isdir("/run/host"):
+        return os.path.join("/run/host", path.lstrip("/"))
+    return path
 
 
 def quoted(arr) -> str:
@@ -379,7 +413,7 @@ def find_in_cdi(devices: list[str]) -> tuple[list[str], list[str]]:
     if platform.system() == "Windows":
         cdi = get_podman_machine_cdi_config()
     else:
-        cdi = load_cdi_config(['/var/run/cdi', '/etc/cdi'])
+        cdi = load_cdi_config([host_path('/var/run/cdi'), host_path('/etc/cdi')])
     try:
         cdi_devices = cdi.get("devices", []) if cdi else []
         cdi_device_names = [name for cdi_device in cdi_devices if (name := cdi_device.get("name"))]
@@ -426,7 +460,7 @@ def check_metal(args: ContainerArgType) -> bool:
 @lru_cache(maxsize=1)
 def check_nvidia() -> Optional[Literal["cuda"]]:
     try:
-        command = ['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader']
+        command = host_cmd(['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader'])
         result = run_cmd(command, encoding="utf-8")
     except (OSError, subprocess.CalledProcessError):
         return None
@@ -455,7 +489,7 @@ def check_nvidia() -> Optional[Literal["cuda"]]:
         # means the toolkit itself is not installed. Pointing the user at
         # "nvidia-ctk cdi generate" in that case is a dead end; tell them to
         # install the toolkit (recent versions generate the CDI config on install).
-        if shutil.which("nvidia-ctk") is None:
+        if not host_available("nvidia-ctk"):
             perror("The nvidia-container-toolkit does not appear to be installed. Install ")
             perror("it to enable GPU support; recent versions generate the CDI ")
             perror("configuration automatically.")
@@ -478,7 +512,7 @@ def check_nvidia() -> Optional[Literal["cuda"]]:
 
 def check_ascend() -> Optional[Literal["cann"]]:
     try:
-        command = ['npu-smi', 'info']
+        command = host_cmd(['npu-smi', 'info'])
         run_cmd(command, encoding="utf-8")
         os.environ["ASCEND_VISIBLE_DEVICES"] = "0"
         return "cann"
@@ -579,7 +613,7 @@ def _check_intel_windows() -> int:
 
 def check_mthreads() -> Optional[Literal["musa"]]:
     try:
-        command = ['mthreads-gmi']
+        command = host_cmd(['mthreads-gmi'])
         run_cmd(command, encoding="utf-8")
         os.environ["MUSA_VISIBLE_DEVICES"] = "0"
         return "musa"
