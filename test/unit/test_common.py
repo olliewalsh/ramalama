@@ -24,6 +24,9 @@ from ramalama.common import (
     ensure_image,
     find_in_cdi,
     get_accel,
+    host_available,
+    host_cmd,
+    host_path,
     in_toolbox,
     load_cdi_config,
     populate_volume_from_image,
@@ -752,3 +755,80 @@ class TestEngineCmd:
             patch("ramalama.common.available", return_value=False),
         ):
             assert engine_cmd("podman") == ["podman"]
+
+
+class TestHostCmd:
+    def test_host_cmd_normal(self):
+        in_toolbox.cache_clear()
+        with patch("ramalama.common.in_toolbox", return_value=False):
+            assert host_cmd(["nvidia-smi"]) == ["nvidia-smi"]
+            assert host_cmd(["nvidia-smi", "-L"]) == ["nvidia-smi", "-L"]
+
+    def test_host_cmd_in_toolbox_with_flatpak_spawn(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=True),
+            patch("ramalama.common.available", side_effect=lambda x: x == "flatpak-spawn"),
+        ):
+            assert host_cmd(["nvidia-smi", "-L"]) == ["flatpak-spawn", "--host", "nvidia-smi", "-L"]
+
+    def test_host_cmd_in_toolbox_without_flatpak_spawn(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=True),
+            patch("ramalama.common.available", return_value=False),
+        ):
+            assert host_cmd(["nvidia-smi"]) == ["nvidia-smi"]
+
+
+class TestHostAvailable:
+    def test_host_available_normal(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=False),
+            patch("ramalama.common.available", side_effect=lambda x: x == "nvidia-ctk"),
+        ):
+            assert host_available("nvidia-ctk") is True
+            assert host_available("missing") is False
+
+    def test_host_available_in_toolbox(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=True),
+            patch("ramalama.common.available", side_effect=lambda x: x == "flatpak-spawn"),
+            patch("ramalama.common.run_cmd") as mock_run,
+        ):
+            assert host_available("nvidia-ctk") is True
+            mock_run.assert_called_once_with(["flatpak-spawn", "--host", "which", "nvidia-ctk"], ignore_all=True)
+
+    def test_host_available_in_toolbox_missing(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=True),
+            patch("ramalama.common.available", side_effect=lambda x: x == "flatpak-spawn"),
+            patch("ramalama.common.run_cmd", side_effect=subprocess.CalledProcessError(1, "which")),
+        ):
+            assert host_available("nvidia-ctk") is False
+
+
+class TestHostPath:
+    def test_host_path_normal(self):
+        in_toolbox.cache_clear()
+        with patch("ramalama.common.in_toolbox", return_value=False):
+            assert host_path("/etc/cdi") == "/etc/cdi"
+
+    def test_host_path_in_toolbox(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=True),
+            patch("os.path.isdir", side_effect=lambda x: x == "/run/host"),
+        ):
+            assert host_path("/etc/cdi") == "/run/host/etc/cdi"
+
+    def test_host_path_in_toolbox_no_run_host(self):
+        in_toolbox.cache_clear()
+        with (
+            patch("ramalama.common.in_toolbox", return_value=True),
+            patch("os.path.isdir", return_value=False),
+        ):
+            assert host_path("/etc/cdi") == "/etc/cdi"

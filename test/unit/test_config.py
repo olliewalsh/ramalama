@@ -192,7 +192,7 @@ class TestGetDefaultEngine:
         with (
             patch("ramalama.config.in_toolbox", return_value=True),
             patch("ramalama.config.available", side_effect=lambda x: x == "flatpak-spawn"),
-            patch("ramalama.config._host_engine_available", side_effect=lambda x: x == "podman"),
+            patch("ramalama.config.host_available", side_effect=lambda x: x == "podman"),
         ):
             assert get_default_engine() == "podman"
 
@@ -200,7 +200,7 @@ class TestGetDefaultEngine:
         with (
             patch("ramalama.config.in_toolbox", return_value=True),
             patch("ramalama.config.available", side_effect=lambda x: x == "flatpak-spawn"),
-            patch("ramalama.config._host_engine_available", side_effect=lambda x: x == "docker"),
+            patch("ramalama.config.host_available", side_effect=lambda x: x == "docker"),
         ):
             assert get_default_engine() == "docker"
 
@@ -208,7 +208,7 @@ class TestGetDefaultEngine:
         with (
             patch("ramalama.config.in_toolbox", return_value=True),
             patch("ramalama.config.available", side_effect=lambda x: x == "flatpak-spawn"),
-            patch("ramalama.config._host_engine_available", return_value=False),
+            patch("ramalama.config.host_available", return_value=False),
         ):
             assert get_default_engine() is None
 
