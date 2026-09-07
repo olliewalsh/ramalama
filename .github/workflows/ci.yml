@@ -81,13 +81,16 @@ jobs:
       matrix:
         variant:
           - title: ""
+            id: linux
             runs-on: ubuntu-24.04
             uv-options: {}
           - title: " (python 3.9)"
+            id: linux-py39
             runs-on: ubuntu-24.04
             uv-options:
               python-version: '3.9'
           - title: " (MacOS)"
+            id: macos
             runs-on: macos-26
             uv-options: {}
     name: Unit Tests${{ matrix.variant.title }}
@@ -103,7 +106,11 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          uv run -- make unit-tests
+          uv run -- make COVERAGE=1 unit-tests
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: unit-${{ matrix.variant.id }}
 
   e2e-tests:
     if: |
@@ -118,9 +125,11 @@ jobs:
       matrix:
         variant:
           - title: ""
+            id: linux
             uv-options:
               activate-environment: true
           - title: " (python 3.9)"
+            id: linux-py39
             uv-options:
               python-version: '3.9'
               activate-environment: true
@@ -181,7 +190,11 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
         run: |
-           make e2e-tests
+           make COVERAGE=1 e2e-tests
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: e2e-podman-${{ matrix.variant.id }}
 
   e2e-tests-nocontainer:
     if: |
@@ -196,9 +209,11 @@ jobs:
       matrix:
         variant:
           - title: ""
+            id: linux
             uv-options:
               activate-environment: true
           - title: " (python 3.9)"
+            id: linux-py39
             uv-options:
               python-version: '3.9'
               activate-environment: true
@@ -257,7 +272,11 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
         run: |
-           make e2e-tests-nocontainer
+           make COVERAGE=1 e2e-tests-nocontainer
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: e2e-nocontainer-${{ matrix.variant.id }}
 
   e2e-tests-docker:
     if: |
@@ -272,9 +291,11 @@ jobs:
       matrix:
         variant:
           - title: ""
+            id: linux
             uv-options:
               activate-environment: true
           - title: " (python 3.9)"
+            id: linux-py39
             uv-options:
               python-version: '3.9'
               activate-environment: true
@@ -353,7 +374,11 @@ jobs:
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
         run: |
            docker info
-           make e2e-tests-docker
+           make COVERAGE=1 e2e-tests-docker
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: e2e-docker-${{ matrix.variant.id }}
 
   e2e-tests-macos:
     if: |
@@ -368,9 +393,11 @@ jobs:
       matrix:
         variant:
           - title: ""
+            id: macos
             uv-options:
               activate-environment: true
           - title: " (python 3.9)"
+            id: macos-py39
             uv-options:
               python-version: '3.9'
               activate-environment: true
@@ -430,7 +457,11 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
         run: |
-          make e2e-tests-nocontainer
+          make COVERAGE=1 e2e-tests-nocontainer
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: e2e-nocontainer-${{ matrix.variant.id }}
 
   e2e-tests-windows:
     if: |
@@ -445,9 +476,11 @@ jobs:
       matrix:
         variant:
           - title: ""
+            id: windows
             uv-options:
               activate-environment: true
           - title: " (python 3.9)"
+            id: windows-py39
             uv-options:
               python-version: '3.9'
               activate-environment: true
@@ -570,6 +603,10 @@ jobs:
           RAMALAMA_CONTAINER_ENGINE: podman
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_ENDPOINT: ${{ secrets.HF_TOKEN == '' && 'http://127.0.0.1:5000' || '' }}
+          # There is no make on the Windows runner, so set what the COVERAGE
+          # knob in the Makefile would have set.
+          COVERAGE_PROCESS_START: ${{ github.workspace }}\pyproject.toml
+          COVERAGE_FILE: ${{ github.workspace }}\.coverage
         run: |
           Write-Host "Running E2E tests..."
           # Add uv tools to PATH
@@ -577,7 +614,7 @@ jobs:
           $env:PATH = "$uvToolsPath;$env:PATH"
 
           # Run tests
-          uv run tox -e e2e -- -v
+          uv run tox -e e2e -- -v --cov
 
       - name: Debug - Show Podman logs on failure
         if: failure()
@@ -597,6 +634,10 @@ jobs:
 
           Write-Host "`n=== Running Containers ==="
           podman ps -a || true
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: e2e-${{ matrix.variant.id }}
 
       - name: Upload test results
         if: always()
@@ -682,7 +723,61 @@ jobs:
         run: |
           SHARED_TMP="$HOME/.cache/ramalama/tmp"
           mkdir -p "$SHARED_TMP"
-          toolbox run -c ramalama-test bash -c "export PATH=\$HOME/.local/bin:\$PATH && cd $GITHUB_WORKSPACE && TMPDIR=$SHARED_TMP HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make e2e-tests"
+          toolbox run -c ramalama-test bash -c "export PATH=\$HOME/.local/bin:\$PATH && cd $GITHUB_WORKSPACE && TMPDIR=$SHARED_TMP HF_TOKEN=$HF_TOKEN HF_ENDPOINT=$HF_ENDPOINT make COVERAGE=1 e2e-tests"
+
+      - uses: ./.github/actions/collect-coverage
+        with:
+          slug: e2e-toolbox
+
+  coverage:
+    # always(), so that a report is still produced when some of the test jobs
+    # fail. Jobs that failed simply contribute no data.
+    if: |
+      always() && (
+        github.event_name == 'pull_request' ||
+        github.ref == 'refs/heads/main' ||
+        github.repository_owner != 'containers'
+      )
+    name: Coverage Report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs:
+      - unit-test
+      - e2e-tests
+      - e2e-tests-nocontainer
+      - e2e-tests-docker
+      - e2e-tests-macos
+      - e2e-tests-windows
+      - e2e-tests-toolbox
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Download coverage data
+        uses: actions/download-artifact@v7
+        with:
+          pattern: coverage-data-*
+          path: coverage-data
+          merge-multiple: true
+
+      - name: Combine coverage data
+        run: |
+          uv tool install coverage
+          make coverage-combine COVERAGE_INPUTS=coverage-data
+
+      - name: Write coverage summary
+        run: |
+          echo '## Coverage' >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown --precision=2 >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
 
 # FIXME: ci script should be able to run on MAC.
 #      - name: Run ci

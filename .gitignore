@@ -17,7 +17,9 @@ venv/
 __pycache__/
 .aider*
 .coverage
+.coverage.*
 coverage/
+coverage-data/
 coverage.*
 htmlcov/
 .idea/

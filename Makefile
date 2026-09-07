@@ -16,6 +16,22 @@ PYTHON_SCRIPTS ?= $(shell grep -lEr "^\#\!\s*/usr/bin/(env +)?python(3)?(\s|$$)"
 RUFF_TARGETS ?= ramalama scripts test bin/ramalama
 E2E_IMAGE ?= localhost/e2e:latest
 
+# Set COVERAGE=1 on any test target to measure code coverage, e.g.
+# `make COVERAGE=1 e2e-tests`. Each run leaves a combined .coverage data file in
+# the project directory; use `make coverage-combine` to merge data files from
+# several runs into a single report.
+#
+# COVERAGE_FILE must be absolute: the e2e tests chdir into a temporary workspace
+# which they delete afterwards, and subprocess data files are written relative to
+# the current directory. COVERAGE_PROCESS_START activates the .pth hook tox
+# installs into the test environment (see commands_pre in pyproject.toml).
+ifdef COVERAGE
+COV_OPTS := --cov
+export COVERAGE_PROCESS_START := $(PROJECT_DIR)/pyproject.toml
+export COVERAGE_FILE := $(PROJECT_DIR)/.coverage
+endif
+COV_POSARGS := $(if $(COV_OPTS),-- $(COV_OPTS))
+
 default: help
 
 help:
@@ -198,15 +214,15 @@ requires-tox:
 
 .PHONY: unit-tests
 unit-tests: requires-tox
-	tox
+	tox $(COV_POSARGS)
 
 .PHONY: unit-tests-verbose
 unit-tests-verbose: requires-tox
-	tox -- --full-trace --capture=tee-sys
+	tox -- --full-trace --capture=tee-sys $(COV_OPTS)
 
 .PHONY: cov-tests
-cov-tests: requires-tox
-	tox -- --cov
+cov-tests:
+	$(MAKE) COVERAGE=1 unit-tests
 
 .PHONY: detailed-cov-tests
 detailed-cov-tests: requires-tox
@@ -214,23 +230,34 @@ detailed-cov-tests: requires-tox
 
 .PHONY: e2e-tests
 e2e-tests: requires-tox
-	tox -q -e e2e
+	tox -q -e e2e $(COV_POSARGS)
 
 .PHONY: e2e-tests-nocontainer
 e2e-tests-nocontainer: requires-tox
-	tox -q -e e2e -- --no-container
+	tox -q -e e2e -- --no-container $(COV_OPTS)
 
 .PHONY: e2e-tests-docker
 e2e-tests-docker: requires-tox
-	tox -q -e e2e -- --container-engine=docker
+	tox -q -e e2e -- --container-engine=docker $(COV_OPTS)
 
 .PHONY: slow-tests
 slow-tests: requires-tox
-	tox -q -e slow
+	tox -q -e slow $(COV_POSARGS)
 
 .PHONY: slow-tests-docker
 slow-tests-docker: requires-tox
-	tox -q -e slow -- --container-engine=docker
+	tox -q -e slow -- --container-engine=docker $(COV_OPTS)
+
+# Merge coverage data files produced by several test runs (or downloaded from
+# several CI jobs) into a single report. COVERAGE_INPUTS may name files or
+# directories; directories are searched for .coverage.* data files.
+COVERAGE_INPUTS ?=
+.PHONY: coverage-combine
+coverage-combine:
+	coverage combine --keep $(COVERAGE_INPUTS)
+	coverage report --precision=2 --skip-covered
+	coverage html
+	coverage xml
 
 .PHONY: end-to-end-tests
 end-to-end-tests: validate e2e-tests e2e-tests-nocontainer slow-tests ci

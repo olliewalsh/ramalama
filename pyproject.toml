@@ -162,10 +162,28 @@ xml.output = "coverage/coverage.xml"
 json.output = "coverage/coverage.json"
 lcov.output = "coverage/coverage.lcov"
 
-[tool.pytest.ini_options]
-testpaths = ["test"]
-markers = ["e2e", "distro_integration", "slow: tests that take more than ~30 seconds, usually running an inference server"]
-addopts = "-m 'not e2e and not slow' --color=yes --durations=10"
+[tool.coverage.run]
+# source_pkgs rather than source: the e2e tests chdir into a temporary
+# workspace, so a directory-relative source would resolve to the wrong place in
+# the `ramalama` subprocesses they spawn.
+source_pkgs = ["ramalama"]
+branch = true
+# Required for the .coverage.<host>.<pid>.<random> files written by subprocesses.
+parallel = true
+# Required to combine data files produced on different machines (and different
+# operating systems) in the CI matrix.
+relative_files = true
+
+[tool.coverage.paths]
+# pytest imports ramalama from the source tree (pytest prepends the rootdir
+# because test/__init__.py exists), but the `ramalama` console script run by the
+# e2e tests imports it from the wheel tox installed into the env. Both must fold
+# into the same reported file. The last pattern is for the Windows CI job.
+source = [
+  "ramalama/",
+  "*/site-packages/ramalama/",
+  "*\\site-packages\\ramalama",
+]
 
 [tool.setuptools.packages.find]
 include = ["ramalama", "ramalama.*"]
@@ -189,6 +207,7 @@ ignore = ["W002"]
 package = "wheel"
 extras = ["dev", "cov"]
 pass_env = [
+  "COVERAGE_*",
   "DBUS_SESSION_BUS_ADDRESS",
   "GITHUB_ACTIONS",
   "HF_ENDPOINT",
@@ -197,6 +216,13 @@ pass_env = [
   "TMPDIR",
 ]
 set_env = { COLUMNS = "120" }
+# Let coverage measure the `ramalama` subprocesses the e2e tests spawn.
+# pytest-cov 7 no longer ships a subprocess hook, so install coverage.py's own.
+# process_startup() is a no-op unless COVERAGE_PROCESS_START is set, so this is
+# inert for ordinary test runs (see the COVERAGE knob in the Makefile).
+commands_pre = [
+  ['python', '-c', 'import pathlib, sysconfig; pathlib.Path(sysconfig.get_paths()["purelib"], "coverage-subprocess.pth").write_text("import coverage; coverage.process_startup()\n")'],
+]
 commands = [
   [
     "pytest",

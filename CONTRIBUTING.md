@@ -208,6 +208,28 @@ make e2e-tests-nocontainer   # Run in no-container mode
 
 The Windows E2E tests run automatically on pull requests that modify relevant code and validate that RamaLama works correctly on Windows with Podman installed.
 
+### Code Coverage
+
+Set `COVERAGE=1` on any test target to measure coverage of the `ramalama` package:
+```bash
+make COVERAGE=1 unit-tests
+make COVERAGE=1 e2e-tests
+```
+The e2e tests invoke `ramalama` as a subprocess, and those subprocesses are measured too.
+Each run leaves a `.coverage` data file in the project directory, which the next run overwrites.
+To report on several runs together, save the data files under different names and merge them:
+```bash
+mkdir -p coverage-data
+make COVERAGE=1 unit-tests && mv .coverage coverage-data/.coverage.unit
+make COVERAGE=1 e2e-tests && mv .coverage coverage-data/.coverage.e2e
+make coverage-combine COVERAGE_INPUTS=coverage-data
+```
+This writes a terminal summary plus HTML and XML reports under `coverage/`.
+
+CI does the same thing across the whole test matrix: every test job uploads its data file as an
+artifact, and the `Coverage Report` job merges them into a single report published to the workflow
+run's job summary.
+
 ## Documentation
 
 Make sure to update the documentation if needed.

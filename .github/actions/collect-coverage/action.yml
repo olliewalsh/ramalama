@@ -1,0 +1,37 @@
+name: Collect coverage data
+description: >-
+  Give this job's coverage data file a unique name and upload it, so that the
+  coverage job can merge the data files from every job in the matrix.
+
+inputs:
+  slug:
+    description: Unique identifier for this job, used in the artifact and data file names.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Rename coverage data
+      shell: bash
+      run: |
+        mkdir -p coverage-data
+        i=0
+        for f in .coverage .coverage.*; do
+          [ -e "$f" ] || continue
+          mv "$f" "coverage-data/.coverage.${{ inputs.slug }}.$i"
+          i=$((i + 1))
+        done
+        if [ "$i" -eq 0 ]; then
+          echo "::error::the test run produced no coverage data files"
+          exit 1
+        fi
+
+    - name: Upload coverage data
+      uses: actions/upload-artifact@v7
+      with:
+        name: coverage-data-${{ inputs.slug }}
+        # .coverage.* are hidden files, which upload-artifact skips by default.
+        include-hidden-files: true
+        if-no-files-found: error
+        path: coverage-data/
+        retention-days: 1
