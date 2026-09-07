@@ -1,0 +1,34 @@
+---
+# https://docs.codecov.com/docs/codecovyml-reference
+
+codecov:
+  notify:
+    # Every test job in the matrix uploads under its own flag, so wait for all
+    # of them before deciding a commit's coverage.
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: 50..75
+  status:
+    project:
+      default:
+        # Report the change without blocking merges on it. Revisit once the
+        # numbers have settled and we know what a realistic target is.
+        informational: true
+    patch:
+      default:
+        informational: true
+
+flag_management:
+  default_rules:
+    # Not every job runs on every commit, and jobs are allowed to fail without
+    # taking the report down with them. Reuse a flag's last known result rather
+    # than counting a missing upload as zero coverage.
+    carryforward: true
+
+comment:
+  layout: "condensed_header, diff, flags, condensed_files"
+  behavior: default
+  require_changes: true

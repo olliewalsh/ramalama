@@ -1,16 +1,41 @@
 name: Collect coverage data
 description: >-
-  Give this job's coverage data file a unique name and upload it, so that the
-  coverage job can merge the data files from every job in the matrix.
+  Upload this job's coverage to Codecov under its own flag, and give its raw
+  coverage data file a unique name and upload that too, so that the coverage
+  job can merge the data files from every job in the matrix.
 
 inputs:
   slug:
-    description: Unique identifier for this job, used in the artifact and data file names.
+    description: >-
+      Unique identifier for this job. Used as the Codecov flag and in the
+      artifact and data file names.
     required: true
+  codecov-token:
+    description: >-
+      Codecov upload token. Optional: uploads from a public repository fall
+      back to a tokenless upload when it is empty, which is also what happens
+      for pull requests from forks, since those cannot read secrets.
+    required: false
+    default: ""
 
 runs:
   using: composite
   steps:
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v7
+      with:
+        files: coverage/coverage.xml
+        # Upload exactly the report named above, rather than whatever else a
+        # workspace search happens to turn up.
+        disable_search: true
+        flags: ${{ inputs.slug }}
+        name: ${{ inputs.slug }}
+        token: ${{ inputs.codecov-token }}
+        # Tokenless uploads share a rate limit and Codecov outages are not our
+        # problem to fail over: the coverage job still produces a report from
+        # the uploaded artifacts.
+        fail_ci_if_error: false
+
     - name: Rename coverage data
       shell: bash
       run: |

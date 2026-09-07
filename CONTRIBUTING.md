@@ -226,9 +226,10 @@ make coverage-combine COVERAGE_INPUTS=coverage-data
 ```
 This writes a terminal summary plus HTML and XML reports under `coverage/`.
 
-CI does the same thing across the whole test matrix: every test job uploads its data file as an
-artifact, and the `Coverage Report` job merges them into a single report published to the workflow
-run's job summary.
+CI does the same thing across the whole test matrix. Every test job uploads its coverage twice:
+to [Codecov](https://app.codecov.io/gh/containers/ramalama) under its own flag, which produces the
+pull request comment and the per-suite breakdown, and as a workflow artifact, which the
+`Coverage Report` job merges into a single report published to the run's job summary.
 
 ## Documentation
 

@@ -111,6 +111,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: unit-${{ matrix.variant.id }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   e2e-tests:
     if: |
@@ -195,6 +196,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: e2e-podman-${{ matrix.variant.id }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   e2e-tests-nocontainer:
     if: |
@@ -277,6 +279,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: e2e-nocontainer-${{ matrix.variant.id }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   e2e-tests-docker:
     if: |
@@ -379,6 +382,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: e2e-docker-${{ matrix.variant.id }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   e2e-tests-macos:
     if: |
@@ -462,6 +466,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: e2e-nocontainer-${{ matrix.variant.id }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   e2e-tests-windows:
     if: |
@@ -614,7 +619,7 @@ jobs:
           $env:PATH = "$uvToolsPath;$env:PATH"
 
           # Run tests
-          uv run tox -e e2e -- -v --cov
+          uv run tox -e e2e -- -v --cov --cov-report=term --cov-report=xml
 
       - name: Debug - Show Podman logs on failure
         if: failure()
@@ -638,6 +643,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: e2e-${{ matrix.variant.id }}
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results
         if: always()
@@ -728,6 +734,7 @@ jobs:
       - uses: ./.github/actions/collect-coverage
         with:
           slug: e2e-toolbox
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   coverage:
     # always(), so that a report is still produced when some of the test jobs

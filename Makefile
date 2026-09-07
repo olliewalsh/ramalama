@@ -18,15 +18,16 @@ E2E_IMAGE ?= localhost/e2e:latest
 
 # Set COVERAGE=1 on any test target to measure code coverage, e.g.
 # `make COVERAGE=1 e2e-tests`. Each run leaves a combined .coverage data file in
-# the project directory; use `make coverage-combine` to merge data files from
-# several runs into a single report.
+# the project directory and an XML report under coverage/; use
+# `make coverage-combine` to merge data files from several runs into a single
+# report.
 #
 # COVERAGE_FILE must be absolute: the e2e tests chdir into a temporary workspace
 # which they delete afterwards, and subprocess data files are written relative to
 # the current directory. COVERAGE_PROCESS_START activates the .pth hook tox
 # installs into the test environment (see commands_pre in pyproject.toml).
 ifdef COVERAGE
-COV_OPTS := --cov
+COV_OPTS := --cov --cov-report=term --cov-report=xml
 export COVERAGE_PROCESS_START := $(PROJECT_DIR)/pyproject.toml
 export COVERAGE_FILE := $(PROJECT_DIR)/.coverage
 endif
