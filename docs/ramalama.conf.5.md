@@ -240,13 +240,13 @@ Valid options: `auto`, `vulkan`, `rocm`, `cuda`, `sycl`, `openvino`, `cann`, `mu
 
 - **auto** (default): Automatically selects the preferred backend based on detected GPU:
   - AMD GPUs: vulkan (Linux/macOS) or rocm (Windows)
-  - NVIDIA GPUs: cuda
+  - NVIDIA GPUs: vulkan (Linux) or cuda (Windows)
   - Intel GPUs: vulkan (Linux/macOS) or sycl (Windows); openvino available as explicit option
   - Ascend NPUs: cann
   - MUSA GPUs: musa
   - No GPU: vulkan (CPU fallback)
 
-- **vulkan**: Use Vulkan-based inference (compatible with AMD, Intel, and CPU)
+- **vulkan**: Use Vulkan-based inference (compatible with AMD, NVIDIA, Intel, and CPU)
 - **rocm**: Use AMD ROCm backend (AMD GPUs only)
 - **cuda**: Use NVIDIA CUDA backend (NVIDIA GPUs only)
 - **sycl**: Use Intel SYCL/oneAPI backend (Intel GPUs only)
@@ -254,7 +254,7 @@ Valid options: `auto`, `vulkan`, `rocm`, `cuda`, `sycl`, `openvino`, `cann`, `mu
 - **cann**: Use Huawei CANN backend (Ascend NPUs only); uses `quay.io/ramalama/cann`
 - **musa**: Use Moore Threads MUSA backend (MUSA GPUs only); uses `quay.io/ramalama/musa`
 
-**Platform-specific behavior**: On Windows, vulkan is not supported on WSL2, so vendor-specific backends (rocm for AMD, sycl for Intel) are automatically preferred when using `backend="auto"`.
+**Platform-specific behavior**: On Windows, vulkan is not supported on WSL2, so vendor-specific backends (rocm for AMD, cuda for NVIDIA, sycl for Intel) are automatically preferred when using `backend="auto"`.
 
 Example configuration:
 

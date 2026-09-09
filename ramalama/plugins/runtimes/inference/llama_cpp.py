@@ -139,10 +139,11 @@ class AddPathOrUrl(argparse.Action):
 
 def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
     """Returns preferred backends for a given GPU type in order of preference.
-    Vulkan is a poor default on WSL2, so vendor backends are preferred there."""
+    Vulkan is a poor default on WSL2, so vendor backends are preferred there.
+    Vulkan is kept in the list so it stays selectable via --backend."""
     preferences = {
         "HIP_VISIBLE_DEVICES": ["vulkan", "rocm"],  # AMD: Vulkan preferred
-        "CUDA_VISIBLE_DEVICES": ["cuda"],  # NVIDIA: CUDA only
+        "CUDA_VISIBLE_DEVICES": ["vulkan", "cuda"],  # NVIDIA: Vulkan preferred
         "INTEL_VISIBLE_DEVICES": ["vulkan", "sycl", "openvino"],  # Intel: Vulkan preferred
         "ASAHI_VISIBLE_DEVICES": ["vulkan"],  # Asahi: Vulkan only
         "ASCEND_VISIBLE_DEVICES": ["cann"],  # Ascend: CANN only
@@ -152,6 +153,7 @@ def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
 
     if is_wsl():
         preferences["HIP_VISIBLE_DEVICES"] = ["rocm", "vulkan"]
+        preferences["CUDA_VISIBLE_DEVICES"] = ["cuda", "vulkan"]
         preferences["INTEL_VISIBLE_DEVICES"] = ["sycl", "vulkan", "openvino"]
 
     return preferences.get(gpu_type, [])

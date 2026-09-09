@@ -58,18 +58,19 @@ Available backends depend on the detected GPU hardware.
 
 **auto** (default): Automatically selects the preferred backend based on your GPU:
 - **AMD GPUs**: vulkan (Linux/macOS) or rocm (Windows)
-- **NVIDIA GPUs**: cuda
+- **NVIDIA GPUs**: vulkan (Linux) or cuda (Windows)
 - **Intel GPUs**: vulkan (Linux/macOS) or sycl (Windows); openvino available as explicit option
 - **Ascend NPUs**: cann
 - **MUSA GPUs**: musa
 - **No GPU**: vulkan (CPU fallback)
 
 **Platform-specific behavior**:
-- On **Linux/macOS**, Vulkan provides broad compatibility and is preferred for AMD and Intel GPUs
-- On **Windows**, vulkan is not supported on WSL2, so vendor-specific backends (rocm, sycl) are preferred
+- On **Linux/macOS**, Vulkan provides broad compatibility, uses a smaller container image, and is
+  preferred for AMD, NVIDIA and Intel GPUs
+- On **Windows**, vulkan is not supported on WSL2, so vendor-specific backends (rocm, cuda, sycl) are preferred
 
 **Explicit backend selection**:
-- **vulkan**: Use Vulkan-based inference (compatible with AMD, Intel, and CPU)
+- **vulkan**: Use Vulkan-based inference (compatible with AMD, NVIDIA, Intel, and CPU)
 - **rocm**: Use AMD ROCm backend (AMD GPUs only)
 - **cuda**: Use NVIDIA CUDA backend (NVIDIA GPUs only)
 - **sycl**: Use Intel SYCL/oneAPI backend (Intel GPUs only)
