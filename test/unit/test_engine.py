@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+import ramalama.common
 import ramalama.engine
 
 
@@ -26,6 +27,29 @@ class TestEngine(unittest.TestCase):
         engine = ramalama.engine.Engine(self.base_args)
         self.assertEqual(engine.use_podman, True)
         self.assertEqual(engine.use_docker, False)
+
+    def _cuda_device_args(self, engine_name):
+        args = Namespace(**{**vars(self.base_args), "engine": engine_name})
+        engine = ramalama.engine.Engine(args)
+        engine.exec_args = []
+        with (
+            patch("ramalama.engine.get_accel_env_vars", return_value={"CUDA_VISIBLE_DEVICES": "0"}),
+            patch("glob.glob", return_value=[]),
+            patch.object(ramalama.common, "podman_machine_accel", False),
+        ):
+            engine.add_device_options()
+        return engine.exec_args
+
+    def test_cuda_device_options_podman(self):
+        exec_args = self._cuda_device_args("podman")
+        self.assertIn("nvidia.com/gpu=all", exec_args)
+        # The legacy nvidia hook hides the Vulkan ICD behind the graphics capability
+        self.assertIn("NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics", exec_args)
+
+    def test_cuda_device_options_docker(self):
+        exec_args = self._cuda_device_args("docker")
+        self.assertIn("--gpus", exec_args)
+        self.assertIn("NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics", exec_args)
 
     def test_add_container_labels(self):
         args = Namespace(**vars(self.base_args), MODEL="test-model", port="8080", subcommand="run")

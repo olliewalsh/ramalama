@@ -123,6 +123,10 @@ class BaseEngine(ABC):
                 else:
                     # newer Podman versions support --gpus=all, but < 5.0 do not
                     self.exec_args += ["--device", "nvidia.com/gpu=all"]
+                # The Vulkan ICD is only injected under the graphics capability.
+                # CDI ignores this, the legacy nvidia-container-runtime hook
+                # used by "docker --gpus" defaults to compute,utility without it.
+                self.exec_args += ["--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics"]
             elif k == "MUSA_VISIBLE_DEVICES":
                 self.exec_args += ["--env", "MTHREADS_VISIBLE_DEVICES=all"]
             elif k == "INTEL_VISIBLE_DEVICES":
