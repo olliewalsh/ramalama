@@ -4,7 +4,6 @@ import argparse
 import copy
 import json
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -40,6 +39,7 @@ from ramalama.common import (
     ensure_image,
     genname,
     get_gpu_type_env_vars,
+    is_wsl,
     run_cmd,
     set_accel_env_vars,
     set_gpu_type_env_vars,
@@ -139,9 +139,7 @@ class AddPathOrUrl(argparse.Action):
 
 def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
     """Returns preferred backends for a given GPU type in order of preference.
-    On Windows, vulkan is not supported on WSL2, so vendor backends are preferred."""
-    is_windows = platform.system() == "Windows"
-
+    Vulkan is a poor default on WSL2, so vendor backends are preferred there."""
     preferences = {
         "HIP_VISIBLE_DEVICES": ["vulkan", "rocm"],  # AMD: Vulkan preferred
         "CUDA_VISIBLE_DEVICES": ["cuda"],  # NVIDIA: CUDA only
@@ -152,7 +150,7 @@ def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
         "GGML_VK_VISIBLE_DEVICES": ["vulkan"],  # Vulkan: Vulkan only
     }
 
-    if is_windows:
+    if is_wsl():
         preferences["HIP_VISIBLE_DEVICES"] = ["rocm", "vulkan"]
         preferences["INTEL_VISIBLE_DEVICES"] = ["sycl", "vulkan", "openvino"]
 

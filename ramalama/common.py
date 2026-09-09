@@ -469,6 +469,26 @@ def check_metal(args: ContainerArgType) -> bool:
 
 
 @lru_cache(maxsize=1)
+def is_wsl() -> bool:
+    """True on native Windows and inside a WSL2 distro.
+
+    WSL2 exposes GPUs through /dev/dxg rather than the native device nodes, so
+    Vulkan there means mesa's dzn driver translating to D3D12 (no cooperative
+    matrix support, no compute tuning) or a silent llvmpipe fallback.
+
+    platform.system() only reports "Windows" for a native Windows interpreter,
+    not for ramalama running inside the WSL2 distro itself.
+    """
+    if platform.system() == "Windows":
+        return True
+    try:
+        with open("/proc/sys/kernel/osrelease") as f:
+            return "microsoft" in f.read().lower()
+    except OSError:
+        return False
+
+
+@lru_cache(maxsize=1)
 def check_nvidia() -> Optional[Literal["cuda"]]:
     try:
         command = host_cmd(['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader'])

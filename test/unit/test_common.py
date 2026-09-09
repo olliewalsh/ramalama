@@ -28,6 +28,7 @@ from ramalama.common import (
     host_cmd,
     host_path,
     in_toolbox,
+    is_wsl,
     load_cdi_config,
     populate_volume_from_image,
     rm_until_substring,
@@ -858,3 +859,36 @@ class TestHostPath:
             patch("os.path.isdir", return_value=False),
         ):
             assert host_path("/etc/cdi") == "/etc/cdi"
+
+
+class TestIsWsl:
+    """is_wsl() must catch both native Windows and ramalama running inside a WSL2 distro."""
+
+    def test_native_windows(self):
+        is_wsl.cache_clear()
+        with patch("ramalama.common.platform.system", return_value="Windows"):
+            assert is_wsl()
+
+    @pytest.mark.parametrize(
+        "osrelease,expected",
+        [
+            ("5.15.167.4-microsoft-standard-WSL2\n", True),
+            ("6.6.87.2-microsoft-standard-WSL2+\n", True),
+            ("7.1.13-100.fc43.x86_64\n", False),
+        ],
+    )
+    def test_osrelease(self, osrelease, expected):
+        is_wsl.cache_clear()
+        with (
+            patch("ramalama.common.platform.system", return_value="Linux"),
+            patch("builtins.open", mock_open(read_data=osrelease)),
+        ):
+            assert is_wsl() == expected
+
+    def test_missing_osrelease(self):
+        is_wsl.cache_clear()
+        with (
+            patch("ramalama.common.platform.system", return_value="Linux"),
+            patch("builtins.open", side_effect=OSError("no /proc")),
+        ):
+            assert not is_wsl()

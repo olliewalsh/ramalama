@@ -29,6 +29,13 @@ from ramalama.plugins.runtimes.inference.mlx import MlxConfig, MlxPlugin
 from ramalama.plugins.runtimes.inference.vllm import VllmPlugin
 
 
+@pytest.fixture(autouse=True)
+def not_wsl(monkeypatch):
+    """Backend defaults differ on WSL2, so pin the non-WSL path by default.
+    Tests covering the WSL2 behaviour override this."""
+    monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.is_wsl", lambda: False)
+
+
 def make_ns(
     container=True,
     file=None,
@@ -1262,8 +1269,8 @@ backend = "{backend}"
 @pytest.mark.parametrize(
     "backend,gpu_env,expected_result",
     [
-        # Auto mode on Windows: ROCm for AMD, CUDA for NVIDIA, sycl for Intel
-        ("auto", "HIP_VISIBLE_DEVICES", version_tagged_image("quay.io/ramalama/rocm")),  # AMD -> ROCm on Windows
+        # Auto mode on WSL2: ROCm for AMD, CUDA for NVIDIA, sycl for Intel
+        ("auto", "HIP_VISIBLE_DEVICES", version_tagged_image("quay.io/ramalama/rocm")),  # AMD -> ROCm on WSL2
         ("auto", "CUDA_VISIBLE_DEVICES", version_tagged_image("quay.io/ramalama/cuda")),  # NVIDIA -> CUDA
         ("auto", "INTEL_VISIBLE_DEVICES", version_tagged_image("quay.io/ramalama/intel-gpu")),  # Intel -> sycl
         # Explicit backends still work
@@ -1274,10 +1281,10 @@ backend = "{backend}"
         ("openvino", "INTEL_VISIBLE_DEVICES", version_tagged_image("quay.io/ramalama/openvino")),
     ],
 )
-def test_backend_selection_windows(backend: str, gpu_env: str, expected_result: str, monkeypatch):
-    """Test that Windows defaults to vendor-specific backends for AMD and Intel."""
+def test_backend_selection_wsl(backend: str, gpu_env: str, expected_result: str, monkeypatch):
+    """Test that WSL2 defaults to vendor-specific backends for AMD and Intel."""
     monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
-    monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.platform.system", lambda: "Windows")
+    monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.is_wsl", lambda: True)
 
     with NamedTemporaryFile('w', delete_on_close=False) as f:
         f.write(f"""\
@@ -1409,16 +1416,16 @@ def test_get_available_backends(gpu_env: Optional[str], expected_backends: list[
 @pytest.mark.parametrize(
     "gpu_env,expected_backends",
     [
-        ("HIP_VISIBLE_DEVICES", ["auto", "rocm", "vulkan"]),  # AMD: ROCm preferred on Windows
+        ("HIP_VISIBLE_DEVICES", ["auto", "rocm", "vulkan"]),  # AMD: ROCm preferred on WSL2
         ("CUDA_VISIBLE_DEVICES", ["auto", "cuda"]),  # NVIDIA: same on all platforms
-        ("INTEL_VISIBLE_DEVICES", ["auto", "sycl", "vulkan", "openvino"]),  # Intel: sycl preferred on Windows
+        ("INTEL_VISIBLE_DEVICES", ["auto", "sycl", "vulkan", "openvino"]),  # Intel: sycl preferred on WSL2
         (None, ["auto", "vulkan"]),  # No GPU: same on all platforms
     ],
 )
-def test_get_available_backends_windows(gpu_env: Optional[str], expected_backends: list[str], monkeypatch):
-    """Test that available backends on Windows prefer vendor-specific backends."""
+def test_get_available_backends_wsl(gpu_env: Optional[str], expected_backends: list[str], monkeypatch):
+    """Test that available backends on WSL2 prefer vendor-specific backends."""
     monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
-    monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.platform.system", lambda: "Windows")
+    monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.is_wsl", lambda: True)
 
     env = {}
     if gpu_env:
