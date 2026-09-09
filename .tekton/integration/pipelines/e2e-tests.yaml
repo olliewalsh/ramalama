@@ -61,8 +61,13 @@ spec:
       - RAMALAMA_DEFAULT_TOOLS_IMAGE=$(tasks.init.results.ramalama-tools-image)
       - RAMALAMA_STACK_IMAGE=$(tasks.init.results.stack-image)
       - RAMALAMA_DEFAULT_PI_IMAGE=$(tasks.init.results.pi-agent-image)
+      # RAMALAMA_IMAGES is keyed by the resolved backend's GPU env var, not by the
+      # detected hardware. NVIDIA now resolves to the vulkan backend by default, so
+      # GGML_VK_VISIBLE_DEVICES must map to the snapshot image too, otherwise the
+      # GPU runs silently fall back to the published quay.io/ramalama/ramalama tag.
       - >-
-        RAMALAMA_IMAGES={"CUDA_VISIBLE_DEVICES": "$(tasks.init.results.cuda-image)"}
+        RAMALAMA_IMAGES={"CUDA_VISIBLE_DEVICES": "$(tasks.init.results.cuda-image)",
+        "GGML_VK_VISIBLE_DEVICES": "$(tasks.init.results.ramalama-image)"}
       - >-
         RAMALAMA_TOOLS_IMAGES={"CUDA_VISIBLE_DEVICES": "$(tasks.init.results.cuda-tools-image)"}
     taskRef:
