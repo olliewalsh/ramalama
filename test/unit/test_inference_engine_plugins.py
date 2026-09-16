@@ -703,10 +703,18 @@ class TestLlamaCppPlugin:
 
     def test_get_container_image_cuda(self):
         config = MagicMock()
-        config.runtimes = {"llama_cpp": {"backend": "auto"}}
+        config.runtimes = {"llama_cpp": {"backend": "cuda"}}
         config.images.get.return_value = None
         image = self.plugin.get_container_image(config, "CUDA_VISIBLE_DEVICES")
         assert image == version_tagged_image("quay.io/ramalama/cuda")
+
+    def test_get_container_image_cuda_auto_prefers_vulkan(self):
+        config = MagicMock()
+        config.runtimes = {"llama_cpp": {"backend": "auto"}}
+        config.images.get.return_value = None
+        config.default_image = version_tagged_image("quay.io/ramalama/ramalama")
+        image = self.plugin.get_container_image(config, "CUDA_VISIBLE_DEVICES")
+        assert image == version_tagged_image("quay.io/ramalama/ramalama")
 
     @pytest.mark.parametrize("has_icd,warned", [(True, False), (False, True)])
     def test_get_container_image_vulkan_on_nvidia_warns_without_icd(self, has_icd, warned, monkeypatch):
@@ -1282,7 +1290,7 @@ class TestConfigureSubcommandsFiltering:
     [
         # Auto mode: Vulkan for AMD and Intel, CUDA for NVIDIA
         ("auto", "HIP_VISIBLE_DEVICES", DEFAULT_IMAGE),  # AMD -> Vulkan -> ramalama image
-        ("auto", "CUDA_VISIBLE_DEVICES", version_tagged_image("quay.io/ramalama/cuda")),
+        ("auto", "CUDA_VISIBLE_DEVICES", DEFAULT_IMAGE),  # NVIDIA -> Vulkan -> ramalama image
         ("auto", "INTEL_VISIBLE_DEVICES", DEFAULT_IMAGE),  # Intel -> Vulkan -> ramalama image
         # Explicit Vulkan: works for AMD and Intel
         ("vulkan", "HIP_VISIBLE_DEVICES", DEFAULT_IMAGE),
@@ -1348,7 +1356,7 @@ backend = "{backend}"
     ],
 )
 def test_backend_selection_wsl(backend: str, gpu_env: str, expected_result: str, monkeypatch):
-    """Test that WSL2 defaults to vendor-specific backends for AMD and Intel."""
+    """Test that WSL2 defaults to vendor-specific backends, NVIDIA included."""
     monkeypatch.setattr("ramalama.common.get_accel", lambda: "none")
     monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.is_windows_or_wsl", lambda: True)
 
@@ -1459,7 +1467,7 @@ backend = "cuda"
     "gpu_env,expected_backends",
     [
         ("HIP_VISIBLE_DEVICES", ["auto", "vulkan", "rocm"]),  # AMD
-        ("CUDA_VISIBLE_DEVICES", ["auto", "cuda", "vulkan"]),  # NVIDIA (CUDA preferred)
+        ("CUDA_VISIBLE_DEVICES", ["auto", "vulkan", "cuda"]),  # NVIDIA (Vulkan preferred)
         ("INTEL_VISIBLE_DEVICES", ["auto", "vulkan", "sycl", "openvino"]),  # Intel (Vulkan preferred)
         ("ASAHI_VISIBLE_DEVICES", ["auto", "vulkan"]),  # Asahi
         ("ASCEND_VISIBLE_DEVICES", ["auto", "cann"]),  # Ascend
@@ -1483,7 +1491,7 @@ def test_get_available_backends(gpu_env: Optional[str], expected_backends: list[
     "gpu_env,expected_backends",
     [
         ("HIP_VISIBLE_DEVICES", ["auto", "rocm", "vulkan"]),  # AMD: ROCm preferred on WSL2
-        ("CUDA_VISIBLE_DEVICES", ["auto", "cuda", "vulkan"]),  # NVIDIA: same on all platforms
+        ("CUDA_VISIBLE_DEVICES", ["auto", "cuda", "vulkan"]),  # NVIDIA: CUDA preferred on WSL2
         ("INTEL_VISIBLE_DEVICES", ["auto", "sycl", "vulkan", "openvino"]),  # Intel: sycl preferred on WSL2
         (None, ["auto", "vulkan"]),  # No GPU: same on all platforms
     ],
@@ -1525,6 +1533,11 @@ class TestBackendHelpers:
         assert backend_to_gpu_env(backend) == expected
 
     def test_gpu_backend_preferences_nvidia(self):
+        prefs = get_gpu_backend_preferences("CUDA_VISIBLE_DEVICES")
+        assert prefs == ["vulkan", "cuda"]
+
+    def test_gpu_backend_preferences_nvidia_wsl(self, monkeypatch):
+        monkeypatch.setattr("ramalama.plugins.runtimes.inference.llama_cpp.is_windows_or_wsl", lambda: True)
         prefs = get_gpu_backend_preferences("CUDA_VISIBLE_DEVICES")
         assert prefs == ["cuda", "vulkan"]
 

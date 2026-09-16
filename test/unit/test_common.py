@@ -190,7 +190,7 @@ image = "{config_override}"
     "accel_env,backend,expected_result",
     [
         # Left on auto, the detected GPU picks the image.
-        ("CUDA_VISIBLE_DEVICES", "auto", version_tagged_image("quay.io/ramalama/cuda")),
+        ("CUDA_VISIBLE_DEVICES", "auto", DEFAULT_IMAGE),
         ("CUDA_VISIBLE_DEVICES", "cuda", version_tagged_image("quay.io/ramalama/cuda")),
         # A backend the user asked for wins over the detected GPU, even though
         # --image defaults to the image that GPU resolves to.

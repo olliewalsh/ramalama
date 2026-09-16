@@ -54,18 +54,19 @@ Available backends depend on the detected GPU hardware.
 
 **auto** (default): Automatically selects the preferred backend based on your GPU:
 - **AMD GPUs**: vulkan (Linux/macOS) or rocm (WSL2)
-- **NVIDIA GPUs**: cuda; vulkan available as explicit option
+- **NVIDIA GPUs**: vulkan (Linux/macOS) or cuda (WSL2)
 - **Intel GPUs**: vulkan (Linux/macOS) or sycl (WSL2); openvino available as explicit option
 - **Ascend NPUs**: cann
 - **MUSA GPUs**: musa
 - **No GPU**: vulkan (CPU fallback)
 
 **Platform-specific behavior**:
-- On **Linux/macOS**, Vulkan provides broad compatibility and is preferred for AMD and Intel GPUs
-- On **WSL2**, Vulkan is a poor default, so vendor-specific backends (rocm, sycl) are preferred. It
-  remains available, and `--backend=vulkan` still selects it. This covers both Windows, where
-  containers run in the WSL2-backed machine, and ramalama running inside a WSL2 distro, which
-  otherwise looks like Linux
+- On **Linux/macOS**, Vulkan provides broad compatibility, uses a smaller container image, and is
+  preferred for AMD, NVIDIA and Intel GPUs
+- On **WSL2**, Vulkan is a poor default, so vendor-specific backends (rocm, cuda, sycl) are
+  preferred. It remains available, and `--backend=vulkan` still selects it. This covers both
+  Windows, where containers run in the WSL2-backed machine, and ramalama running inside a WSL2
+  distro, which otherwise looks like Linux
 
 **Explicit backend selection**:
 - **vulkan**: Use Vulkan-based inference (compatible with AMD, NVIDIA, Intel, and CPU)

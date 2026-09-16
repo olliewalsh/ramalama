@@ -144,7 +144,7 @@ def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
     Vulkan is a poor default on WSL2, so vendor backends are preferred there."""
     preferences = {
         "HIP_VISIBLE_DEVICES": ["vulkan", "rocm"],  # AMD: Vulkan preferred
-        "CUDA_VISIBLE_DEVICES": ["cuda", "vulkan"],  # NVIDIA: CUDA preferred
+        "CUDA_VISIBLE_DEVICES": ["vulkan", "cuda"],  # NVIDIA: Vulkan preferred
         "INTEL_VISIBLE_DEVICES": ["vulkan", "sycl", "openvino"],  # Intel: Vulkan preferred
         "ASAHI_VISIBLE_DEVICES": ["vulkan"],  # Asahi: Vulkan only
         "ASCEND_VISIBLE_DEVICES": ["cann"],  # Ascend: CANN only
@@ -154,6 +154,7 @@ def get_gpu_backend_preferences(gpu_type: str) -> list[str]:
 
     if is_windows_or_wsl():
         preferences["HIP_VISIBLE_DEVICES"] = ["rocm", "vulkan"]
+        preferences["CUDA_VISIBLE_DEVICES"] = ["cuda", "vulkan"]
         preferences["INTEL_VISIBLE_DEVICES"] = ["sycl", "vulkan", "openvino"]
 
     return preferences.get(gpu_type, [])
