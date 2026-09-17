@@ -4,6 +4,8 @@ import os
 import shlex
 from typing import Optional, Tuple
 
+# Live reference for checking global vars
+import ramalama.common
 from ramalama.common import MNT_DIR, RAG_DIR, ContainerEntryPoint, get_accel, get_accel_env_vars
 from ramalama.file import UnitFile
 from ramalama.host_utils import format_bind_host_publish_prefix, is_loopback_bind_host
@@ -68,11 +70,16 @@ class Quadlet:
         quadlet_file = UnitFile(container_file_name)
         quadlet_file.add("Unit", "Description", f"RamaLama {self.name} AI Model Service")
         quadlet_file.add("Unit", "After", "local-fs.target")
-        quadlet_file.add("Container", "AddDevice", "-/dev/accel")
-        quadlet_file.add("Container", "AddDevice", "-/dev/dri")
-        quadlet_file.add("Container", "AddDevice", "-/dev/kfd")
         if get_accel() == "cuda":
-            quadlet_file.add("Container", "AddDevice", "nvidia.com/gpu=all")
+            # The container toolkit brings in the NVIDIA device nodes itself, so
+            # the host's GPU devices would only add ones that are not the GPU in
+            # play, such as an iGPU. See get_gpu_devices().
+            for name in ramalama.common.nvidia_selected_devices or ["all"]:
+                quadlet_file.add("Container", "AddDevice", f"nvidia.com/gpu={name}")
+        else:
+            quadlet_file.add("Container", "AddDevice", "-/dev/accel")
+            quadlet_file.add("Container", "AddDevice", "-/dev/dri")
+            quadlet_file.add("Container", "AddDevice", "-/dev/kfd")
         quadlet_file.add("Container", "Image", f"{self.image}")
         quadlet_file.add("Container", "RunInit", "true")
         quadlet_file.add("Container", "Environment", "HOME=/tmp")
